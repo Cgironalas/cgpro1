@@ -1,6 +1,0 @@
-# depslib dependency file v1.0
-1472353976 source:/home/carlos/Documents/cgpro1/pro1.c
-	<stdio.h>
-	<stdlib.h>
-	<string.h>
-
