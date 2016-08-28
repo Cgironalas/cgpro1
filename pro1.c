@@ -317,12 +317,12 @@ void readFiles(){
     calculateMinMax(totalVertexCount);
 }
 
-void drawBorders (struct Coord *pParam, int pene) {
+void drawBorders (struct Coord *pParam, int pColores) {
     int counter = 0;
     int i;
     for(i = 0; i < ptp; i++){
 
-        glColor3f ( ((double)i*50)/255 , pene , ((double)i+50)/255 ); 
+        glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
         
         paintPolygon(vertexAmounts[i], pParam, plot, counter);
         counter += vertexAmounts[i];
