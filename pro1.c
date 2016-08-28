@@ -11,11 +11,13 @@
 
 static int res = 800;
 
-static double Xmin =  100;
-static double Xmax =  -100;
-static double Ymin = 12;
-static double Ymax =  1;
+static double Xmin;
+static double Xmax;
+static double Ymin;
+static double Ymax;
 
+static int vertexAmounts[7];
+static int provinceCounter = 0;
 
 typedef struct {
   double r;
@@ -46,10 +48,7 @@ void plot (int x, int y){
     glBegin (GL_POINTS);
     glVertex2i (x,y);
     glEnd();
-
-    //glFlush();
 }
-
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     int d2x,d2y,dx,dy,d,
         Delta_N,Delta_NE,Delta_E,Delta_SE,
@@ -221,98 +220,18 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
-void paintPolygon(int vertexAmount, struct Coordenada *coordenadas, void (*f)(int,int)){
+void calculateMinMax(int vertexAmount, struct Coordenada *coordenadas){
     int i;
-    int Yf[vertexAmount];
-    int Xf[vertexAmount];
-    for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((coordenadas[i].latitud - Ymin) / (Ymax - Ymin)));
-        Xf[i] = (int) (res * ((coordenadas[i].longitud - Xmin) / (Xmax - Xmin)));
-    }
-    printf("%d\n", Yf[0]);
-    printf("%d\n", Xf[0]);
-    for(i = 0; i < vertexAmount - 1; i++){
-        bresenham(Xf[i], Yf[i], Xf[i+1], Yf[i+1],(*f));
-    }
-    bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
-}
-
-int main(int argc, char *argv[]){
-    buffer = (COLOR **)malloc(res * sizeof(COLOR*));
-    
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-    glutInitWindowSize(res,res);
-    glutCreateWindow("CG Proyecto 0");
-    glClear(GL_COLOR_BUFFER_BIT);
-    gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
-
-
-
-    FILE* file = fopen("test.txt", "r");
-    int vertexAmount = 0;
-    int c;
-    while ((c = getc(file)) != EOF){
-        if(c == '\n'){
-            vertexAmount++;
-        }
-    }
-    vertexAmount++;
-    fclose(file);
-    printf("%d", vertexAmount);
-    printf("\n");
-
-
-    struct Coordenada coordAlajuela[vertexAmount];       //1
-    struct Coordenada coordCartago[vertexAmount];        //2
-    struct Coordenada coordGuanacaste[vertexAmount];     //3
-    struct Coordenada coordHeredia[vertexAmount];        //4
-    struct Coordenada coordLimon[vertexAmount];          //5
-    struct Coordenada coordPuntarenas[vertexAmount];     //6
-    struct Coordenada coordSanJose[vertexAmount];        //7
-
-
-
-    FILE* g = fopen("test.txt", "r");
-    char comma;
-    double lon, lat;
-    int i;
-    int j;
+    Xmin = min(coordenadas[0].longitud, coordenadas[1].longitud);
+    Xmax = max(coordenadas[0].longitud, coordenadas[1].longitud);
+    Ymin = min(coordenadas[0].latitud, coordenadas[1].latitud);
+    Ymax = max(coordenadas[0].latitud, coordenadas[1].latitud);
 
     for(i = 0; i < vertexAmount; i++){
-        for(j = 0; j < 2; j++){
-            if(j == 0){
-                fscanf(g,"%lf", &lon);
-                fscanf(g, "%c", &comma);
-            }else{
-                fscanf(g,"%lf", &lat);
-                //fscanf(g, "%c", &comma);
-            }
-        }
-        coordAlajuela[i].longitud = lon;
-        coordAlajuela[i].latitud = lat;
-        coordAlajuela[i].w = 1;
-    }
-    fclose(g);
-    /*
-    for(i = 0; i < vertexAmount; i++){
-        printf("%d", i);
-        printf("\n");
-        printf("%.14lf ", coordAlajuela[i].longitud);
-        printf("%.14lf ", coordAlajuela[i].latitud);
-        printf("\n");
-    }*/
-
-    //double minX = 100;
-    //double minY = 12;
-    //double maxX = -100;
-    //double maxY = 1;
-
-    for(i = 0; i < vertexAmount; i++){
-        Xmin = min(Xmin, coordAlajuela[i].longitud);
-        Xmax = max(Xmax, coordAlajuela[i].longitud);
-        Ymin = min(Ymin, coordAlajuela[i].latitud);
-        Ymax = max(Ymax, coordAlajuela[i].latitud);
+        Xmin = min(Xmin, coordenadas[i].longitud);
+        Xmax = max(Xmax, coordenadas[i].longitud);
+        Ymin = min(Ymin, coordenadas[i].latitud);
+        Ymax = max(Ymax, coordenadas[i].latitud);
     }
     printf("Minimos: X = ");
     printf("%.14lf ",Xmin);
@@ -325,11 +244,82 @@ int main(int argc, char *argv[]){
     printf("  Y = ");
     printf("%.14lf ",Ymax);
     printf("\n");
+}
 
-    //printf("Jk");
-    //printf("\n");
+void paintPolygon(int vertexAmount, struct Coordenada *coordenadas, void (*f)(int,int), int counter){
+    int i;
+    int Yf[vertexAmount];
+    int Xf[vertexAmount];
+    for(i = 0; i < vertexAmount; i++){
+        Yf[i] = (int) (res * ((coordenadas[counter + i].latitud - Ymin) / (Ymax - Ymin)));
+        Xf[i] = (int) (res * ((coordenadas[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+    }
+    for(i = 0; i < vertexAmount - 1; i++){
+        bresenham(Xf[i], Yf[i], Xf[i+1], Yf[i+1],(*f));
+    }
+    bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
+}
 
-    paintPolygon(vertexAmount, coordAlajuela, plot);
+void leerArchivos(){
+    char *provinces[7] = {"mapa/Alajuela.txt", "mapa/Cartago.txt", "mapa/Guanacaste.txt", "mapa/Heredia.txt", "mapa/Limon.txt", "mapa/Puntarenas.txt", "mapa/SanJose.txt"};
+    char comma;
+    int i, j, k, c, vertexAmount;
+    int totalVertexCount = 0;
+    int vertexAmounts[7];
+    int counter = 0;
+    double lon, lat;
+    for(i = 0; i < 7; i++){
+        FILE* file = fopen(provinces[i], "r");
+        vertexAmount = 0;
+        while ((c = getc(file)) != EOF){
+            if(c == '\n'){
+                vertexAmount++;
+                totalVertexCount++;
+            }
+        }
+        vertexAmount++;
+        totalVertexCount++;
+        fclose(file);
+        vertexAmounts[i] = vertexAmount;
+    }
+    struct Coordenada coordenadas[totalVertexCount];
+    for(k = 0; k < 7; k++){
+        FILE* g = fopen(provinces[k], "r");
+        for(i = 0; i < vertexAmounts[k]; i++){
+            for(j = 0; j < 2; j++){
+                if(j == 0){
+                    fscanf(g,"%lf", &lon);
+                    fscanf(g, "%c", &comma);
+                }else{
+                    fscanf(g,"%lf", &lat);
+                }
+            }
+            coordenadas[counter + i].longitud = lon;
+            coordenadas[counter + i].latitud = lat;
+            coordenadas[counter + i].w = 1;
+        }
+        counter += vertexAmounts[k];
+        fclose(g);
+    }
+    calculateMinMax(totalVertexCount,coordenadas);
+    counter = 0;
+    for(i = 0; i < 7; i++){
+        paintPolygon(vertexAmounts[i], coordenadas, plot, counter);
+        counter += vertexAmounts[i];
+    }
+}
+
+int main(int argc, char *argv[]){
+    buffer = (COLOR **)malloc(res * sizeof(COLOR*));
+    
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(res,res);
+    glutCreateWindow("CG Proyecto 0");
+    glClear(GL_COLOR_BUFFER_BIT);
+    gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
+
+    leerArchivos();
     glFlush();
     glutMainLoop();
 }
