@@ -16,8 +16,18 @@ static double Xmax;
 static double Ymin;
 static double Ymax;
 
-static int vertexAmounts[7];
 static int provinceCounter = 0;
+
+struct Coord {
+    double longitud;
+    double latitud;
+    double w;
+};
+
+static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
+static int ptp = 7;
+static int vertexAmounts[7];
+static struct Coord *coords;
 
 typedef struct {
   double r;
@@ -27,16 +37,13 @@ typedef struct {
 
 COLOR **buffer;
 
-struct Coordenada {
-    double longitud;
-    double latitud;
-    double w;
-};
+
 
 double min(double a, double b){
     if(a < b) { return a; }
     else { return b; }
 }
+
 double max(double a, double b){
     if(a < b) { return b; }
     else { return a; }
@@ -49,6 +56,7 @@ void plot (int x, int y){
     glVertex2i (x,y);
     glEnd();
 }
+
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     int d2x,d2y,dx,dy,d,
         Delta_N,Delta_NE,Delta_E,Delta_SE,
@@ -220,61 +228,55 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
-void calculateMinMax(int vertexAmount, struct Coordenada *coordenadas){
+void calculateMinMax(int vertexAmount){
     int i;
-    Xmin = min(coordenadas[0].longitud, coordenadas[1].longitud);
-    Xmax = max(coordenadas[0].longitud, coordenadas[1].longitud);
-    Ymin = min(coordenadas[0].latitud, coordenadas[1].latitud);
-    Ymax = max(coordenadas[0].latitud, coordenadas[1].latitud);
+    Xmin = min(coords[0].longitud, coords[1].longitud);
+    Xmax = max(coords[0].longitud, coords[1].longitud);
+    Ymin = min(coords[0].latitud, coords[1].latitud);
+    Ymax = max(coords[0].latitud, coords[1].latitud);
 
     for(i = 0; i < vertexAmount; i++){
-        Xmin = min(Xmin, coordenadas[i].longitud);
-        Xmax = max(Xmax, coordenadas[i].longitud);
-        Ymin = min(Ymin, coordenadas[i].latitud);
-        Ymax = max(Ymax, coordenadas[i].latitud);
+        Xmin = min(Xmin, coords[i].longitud);
+        Xmax = max(Xmax, coords[i].longitud);
+        Ymin = min(Ymin, coords[i].latitud);
+        Ymax = max(Ymax, coords[i].latitud);
     }
-    printf("Minimos: X = ");
-    printf("%.14lf ",Xmin);
-    printf("  Y = ");
-    printf("%.14lf ",Ymin);
-    printf("\n");
-
-    printf("Maximos: X = ");
-    printf("%.14lf ",Xmax);
-    printf("  Y = ");
-    printf("%.14lf ",Ymax);
-    printf("\n");
 }
 
-void paintPolygon(int vertexAmount, struct Coordenada *coordenadas, void (*f)(int,int), int counter){
+void paintPolygon(int vertexAmount, struct Coord *coords, void (*f)(int,int), int counter){
     int i;
     int Yf[vertexAmount];
     int Xf[vertexAmount];
+
     for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((coordenadas[counter + i].latitud - Ymin) / (Ymax - Ymin)));
-        Xf[i] = (int) (res * ((coordenadas[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+        Yf[i] = (int) (res * ((coords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
+        Xf[i] = (int) (res * ((coords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
     }
+    
     for(i = 0; i < vertexAmount - 1; i++){
         bresenham(Xf[i], Yf[i], Xf[i+1], Yf[i+1],(*f));
     }
+    
     bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
 }
 
 void readFiles(){
+
     char *provinces[7] = {"mapa/Puntarenas.txt",
                           "mapa/Alajuela.txt",
-                          "mapa/Cartago.txt",
                           "mapa/Limon.txt", 
                           "mapa/SanJose.txt",
                           "mapa/Heredia.txt",
-                          "mapa/Guanacaste.txt"};
+                          "mapa/Guanacaste.txt",
+                          "mapa/Cartago.txt"  };
+    
     char comma;
     int i, j, k, c, vertexAmount;
     int totalVertexCount = 0;
-    int vertexAmounts[7];
+
     int counter = 0;
     double lon, lat;
-    int ptp = 7;
+
     for(i = 0; i < ptp; i++){
         FILE* file = fopen(provinces[i], "r");
         vertexAmount = 0;
@@ -289,7 +291,10 @@ void readFiles(){
         fclose(file);
         vertexAmounts[i] = vertexAmount;
     }
-    struct Coordenada coordenadas[totalVertexCount];
+    
+    //coords = (struct Coord*)calloc(totalVertexCount, sizeof(struct Coord));
+    coords = malloc(sizeof(struct Coord)*totalVertexCount);
+
     for(k = 0; k < ptp; k++){
         FILE* g = fopen(provinces[k], "r");
         for(i = 0; i < vertexAmounts[k]; i++){
@@ -301,30 +306,30 @@ void readFiles(){
                     fscanf(g,"%lf", &lat);
                 }
             }
-            coordenadas[counter + i].longitud = lon;
-            coordenadas[counter + i].latitud = lat;
-            coordenadas[counter + i].w = 1;
+            coords[counter + i].longitud = lon;
+            coords[counter + i].latitud = lat;
+            coords[counter + i].w = 1;
         }
         counter += vertexAmounts[k];
         fclose(g);
     }
-    calculateMinMax(totalVertexCount,coordenadas);
-    counter = 0;
-    for(i = 0; i < ptp; i++){
-        
-        if (i==0) {glColor3f (0,1,1);}    
-        if (i==1) {glColor3f (1,1,0);}
-        if (i==2) {glColor3f (1,0,0);}
-        if (i==3) {glColor3f (1,0,1);}
-        if (i==4) {glColor3f (1,0,0);}
-        if (i==5) {glColor3f (1,1,1);}
-        if (i==6) {glColor3f (0,1,0);}
-        if (i==7) {glColor3f (0,0,1);}
+    
+    calculateMinMax(totalVertexCount);
+}
 
-        paintPolygon(vertexAmounts[i], coordenadas, plot, counter);
+void drawBorders (struct Coord *pParam, int pene) {
+    int counter = 0;
+    int i;
+    for(i = 0; i < ptp; i++){
+
+        glColor3f ( ((double)i*50)/255 , pene , ((double)i+50)/255 ); 
+        
+        paintPolygon(vertexAmounts[i], pParam, plot, counter);
         counter += vertexAmounts[i];
     }
+    //free(coords);
 }
+
 
 int main(int argc, char *argv[]){
     buffer = (COLOR **)malloc(res * sizeof(COLOR*));
@@ -337,6 +342,7 @@ int main(int argc, char *argv[]){
     gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
 
     readFiles();
+    drawBorders(coords, 1);
     glFlush();
     glutMainLoop();
 }
