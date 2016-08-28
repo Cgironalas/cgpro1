@@ -260,15 +260,22 @@ void paintPolygon(int vertexAmount, struct Coordenada *coordenadas, void (*f)(in
     bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
 }
 
-void leerArchivos(){
-    char *provinces[7] = {"mapa/Alajuela.txt", "mapa/Cartago.txt", "mapa/Guanacaste.txt", "mapa/Heredia.txt", "mapa/Limon.txt", "mapa/Puntarenas.txt", "mapa/SanJose.txt"};
+void readFiles(){
+    char *provinces[7] = {"mapa/Puntarenas.txt",
+                          "mapa/Alajuela.txt",
+                          "mapa/Cartago.txt",
+                          "mapa/Limon.txt", 
+                          "mapa/SanJose.txt",
+                          "mapa/Heredia.txt",
+                          "mapa/Guanacaste.txt"};
     char comma;
     int i, j, k, c, vertexAmount;
     int totalVertexCount = 0;
     int vertexAmounts[7];
     int counter = 0;
     double lon, lat;
-    for(i = 0; i < 7; i++){
+    int ptp = 7;
+    for(i = 0; i < ptp; i++){
         FILE* file = fopen(provinces[i], "r");
         vertexAmount = 0;
         while ((c = getc(file)) != EOF){
@@ -283,7 +290,7 @@ void leerArchivos(){
         vertexAmounts[i] = vertexAmount;
     }
     struct Coordenada coordenadas[totalVertexCount];
-    for(k = 0; k < 7; k++){
+    for(k = 0; k < ptp; k++){
         FILE* g = fopen(provinces[k], "r");
         for(i = 0; i < vertexAmounts[k]; i++){
             for(j = 0; j < 2; j++){
@@ -303,7 +310,17 @@ void leerArchivos(){
     }
     calculateMinMax(totalVertexCount,coordenadas);
     counter = 0;
-    for(i = 0; i < 7; i++){
+    for(i = 0; i < ptp; i++){
+        
+        if (i==0) {glColor3f (0,1,1);}    
+        if (i==1) {glColor3f (1,1,0);}
+        if (i==2) {glColor3f (1,0,0);}
+        if (i==3) {glColor3f (1,0,1);}
+        if (i==4) {glColor3f (1,0,0);}
+        if (i==5) {glColor3f (1,1,1);}
+        if (i==6) {glColor3f (0,1,0);}
+        if (i==7) {glColor3f (0,0,1);}
+
         paintPolygon(vertexAmounts[i], coordenadas, plot, counter);
         counter += vertexAmounts[i];
     }
@@ -319,7 +336,7 @@ int main(int argc, char *argv[]){
     glClear(GL_COLOR_BUFFER_BIT);
     gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
 
-    leerArchivos();
+    readFiles();
     glFlush();
     glutMainLoop();
 }
