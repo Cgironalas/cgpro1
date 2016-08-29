@@ -10,13 +10,12 @@
 #include <GL/glut.h>
 
 static int res = 800;
-
 static double Xmin;
 static double Xmax;
 static double Ymin;
 static double Ymax;
-
 static int provinceCounter = 0;
+static int totalVertexCount = 0;
 
 struct Coord {
     double longitud;
@@ -24,12 +23,23 @@ struct Coord {
     double w;
 };
 
+struct Border {
+    double x0;
+    double x1;
+    double y0;
+    double y1;
+    
+    double d;
+    int activated;
+    double inc;
+};
 
 
 static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
-static int ptp = 7;
+static int ptp = 1;
 static int vertexAmounts[7];
 static struct Coord *coords;
+static struct Border *borders;
 
 typedef struct {
   double r;
@@ -38,11 +48,6 @@ typedef struct {
 } COLOR;
 
 COLOR **buffer;
-
-
-
-
-
 
 double min(double a, double b){
     if(a < b) { return a; }
@@ -68,11 +73,13 @@ void renderScene(void){
     glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
-    drawBorders(coords, 0);
+    drawAllPolygonsBorders(coords, 0);
     glFlush();
     glutSwapBuffers();
 }
 
+//////////////////TROYO...
+/*
 void processKeyPressed(unsigned char key, int x, int y){
 
 
@@ -99,7 +106,6 @@ void processKeyPressed(unsigned char key, int x, int y){
         
 }
 
-
 void mouse(int button, int state, int x, int y){
 
     if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
@@ -118,7 +124,7 @@ void mouse(int button, int state, int x, int y){
         printf("Mouse click %s en (%d , %d ) \n", (state==GLUT_DOWN)? "Down":"Up", x, y);
     }
 }
-
+/*
 void specialKeys(int key, int x, int y){
 
     int specialMode = glutGetModifiers();
@@ -151,15 +157,14 @@ void specialKeys(int key, int x, int y){
     }
 }
 
-
 /*
     directionPan {0 = up, 1 = down, 2= right, 3 = left}
     specialMode = tecla de modo.
 */
+   /*
 void panning(unsigned int directionPan , int specialMode){
 
     if (specialMode == GLUT_ACTIVE_SHIFT){
-        {}
         panEntireScene(2, directionPan, 0.3);
 
         printf("Fast panning \n");
@@ -171,13 +176,14 @@ void panning(unsigned int directionPan , int specialMode){
     }else{ //Modo normal
         panEntireScene(0, directionPan, 0.125);
     }
-}
+}*/
 
 
 /*
     typeZoom{0 = Zoom Out, 1 = Zoom In }
     specialMode = tecla de modo.
 */
+    /*
 void zooming(unsigned int typeZoom, int specialMode){
     
     double z;
@@ -194,7 +200,7 @@ void zooming(unsigned int typeZoom, int specialMode){
         
     }else if (specialMode == GLUT_ACTIVE_CTRL){
 
-        z=1.5
+        z=1.5;
         printf("Slow zooming \n");
         if (typeZoom==0){ //Zoom out
             zoomScene(directionPan, z);
@@ -207,17 +213,17 @@ void zooming(unsigned int typeZoom, int specialMode){
         if (typeZoom==0){  //Zoom out
             zoomScene(directionPan, z);
         }else {
-            zoomScene(directionPan, 1/Z);    
+            zoomScene(directionPan, 1/z);    
         }
     }
+}
 
 
-sÍ
 /*
     mode{0==NORMAL, 1 slow y 2 fast}
     direction {0 = up, 1 = down, 2= right, 3 = left}
     0.0 percentage < 1.0 para evitar división
-*/
+
 void panEntireScene(unsigned int direction, double percentage){
 
     if (direction== 2 || direction==3){ //ES paneo horizontal
@@ -255,17 +261,17 @@ void panEntireScene(unsigned int direction, double percentage){
 /*
     mode{0==NORMAL, 1 slow y 2 fast}
     direction {0 = Zoom Out, 1 = Zoom In }
-*/
+
 void zoomScene(double percentage){
 
     //Cálculo del punto central de la ventana actual
     double xCenter = (double)(Xmax-Xmin)/2;
-    double xCenter = (double)(Ymax-Ymin)/2;
+    //double xCenter = (double)(Ymax-Ymin)/2;
 
-    Xmin=;
-    Ymax=;
-    Xmax=;
-    Ymax=;
+    Xmin= Xmin;
+    Ymax= Ymax;
+    Xmax= Xmax;
+    Ymax= Ymax;
 
 
 
@@ -274,8 +280,7 @@ void zoomScene(double percentage){
 
     glutDisplayFunc(renderScene);
 }
-
-
+*/
 
 
 //Trazo de la línea entre dos puntos.
@@ -576,23 +581,113 @@ void calculateMinMax(int vertexAmount){
 }
 
 
+void drawHorLine (int x0, int x1, int y){
+    int i;
+    for (i = x0; i < x1; i++){
+        plot(i,y);
+    }
+}
 
 
+int localMinMax(int y, struct Border firstB, struct Border lastB){
+    if  ( (firstB.y1 < y) && (firstB.y0 < y) && (lastB.y1 < y) && (lastB.y0 < y) ) {
+        return 1;
+    } else if ( (firstB.y1 > y) && (firstB.y0 > y) && (lastB.y1 > y) && (lastB.y0 > y) ) { 
+        return 1; 
+    } else { 
+        return 0; 
+    }
+}
 
-void paintPolygon(int vertexAmount, struct Coord *coords, void (*f)(int,int), int counter){
+
+void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter) {
+    int i,x;
+    int vertexAmount2 = vertexAmount;
+    int Yf[vertexAmount];
+    int Xf[vertexAmount];
+    int scanline = res;
+
+    int rsba = vertexAmount; //Real size of the border array 
+    int ignored = 0;
+    
+    //Mapeo a puntos del framebuffer. 
+    for(i = 0; i < vertexAmount; i++){
+        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
+        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+    }
+
+    //Calculation of the real size. 
+    for(i = 0; i < vertexAmount; i++){ 
+        if ((Yf[i+1] - Yf[i]) == 0) {
+            rsba --; //The borders to be ignored. 
+        }
+    }
+
+    borders = malloc(sizeof(struct Border)*rsba);
+    
+    printf("%i\n", rsba);
+
+    for(i = 1; i <= vertexAmount; i++){ //Loops over the full size because it'll ignore horizontal borders again
+        x = i-ignored;
+        if ((Yf[x] - Yf[x-1]) != 0) {
+            borders[x-1].x0 = Xf[x-1];
+            borders[x-1].y0 = Yf[x-1]; 
+            borders[x-1].x1 = Xf[x];
+            borders[x-1].y1 = Yf[x];
+            borders[x-1].d = ((double)Xf[i] + Xf[i+1]) / (Yf[i+1] - Yf[i]);
+            borders[x-1].activated = 0; //They all start deactivated
+            borders[x-1].inc = 0; 
+        }
+        else {
+            ignored++;
+        }
+    }   
+
+    if ((Yf[x] - Yf[x-1]) != 0) {
+        borders[x-1].x0 = Xf[x-1];
+        borders[x-1].y0 = Yf[x-1]; 
+        borders[x-1].x1 = Xf[0];
+        borders[x-1].y1 = Yf[0];
+        borders[x-1].d = ((double)Xf[i] + Xf[i+1]) / (Yf[i+1] - Yf[i]);
+        borders[x-1].activated = 0; //They all start deactivated
+        borders[x-1].inc = 0; 
+    }
+
+    for (i=0;i<rsba;i++){
+        printf("(%f,%f) a (%f,%f)\n", borders[i].x0, borders[i].y0, borders[i].x1, borders[i].y1);
+    }
+
+    // Algoritmo principal. 
+    while (scanline >= Ymin) {
+        //Activar bordes
+        for (i = 0; i < vertexAmount; i++) {
+
+        }
+        //Ordenar intersecciones 
+
+        //Pintar de dos en dos
+
+        //Activos += -1/m
+
+        //Desactivar bordes
+        scanline--;
+    }
+}
+
+
+void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter){//antes paintPolygon
     int i;
     int Yf[vertexAmount];
     int Xf[vertexAmount];
 
     for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((coords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
-        Xf[i] = (int) (res * ((coords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin))); 
+        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin))); 
     }
     
     for(i = 0; i < vertexAmount - 1; i++){
         bresenham(Xf[i], Yf[i], Xf[i+1], Yf[i+1],(*f));
     }
-    
     bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
 }
 
@@ -602,17 +697,17 @@ void paintPolygon(int vertexAmount, struct Coord *coords, void (*f)(int,int), in
 //Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
 void readFiles(){
 
-    char *provinces[7] = {"mapa/Puntarenas.txt",
+    char *provinces[8] = {"mapa/figura_p1.txt",
+                          "mapa/Puntarenas.txt",
                           "mapa/Alajuela.txt",
                           "mapa/Limon.txt", 
                           "mapa/SanJose.txt",
                           "mapa/Heredia.txt",
                           "mapa/Guanacaste.txt",
-                          "mapa/Cartago.txt"  };
+                          "mapa/Cartago.txt" };
     
     char comma;
     int i, j, k, c, vertexAmount;
-    int totalVertexCount = 0;
 
     int counter = 0;
     double lon, lat;
@@ -657,20 +752,31 @@ void readFiles(){
     calculateMinMax(totalVertexCount);
 }
 
-void drawBorders (struct Coord *pParam, int pColores) {
+void drawAllPolygonsBorders (struct Coord *pParam, int pColores) {//antes drawBorders
     int counter = 0;
     int i;
     for(i = 0; i < ptp; i++){
 
         glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
         
-        paintPolygon(vertexAmounts[i], pParam, plot, counter);
-        counter += vertexAmounts[i];
+        delineate(vertexAmounts[i], pParam, plot, counter); 
+        counter += vertexAmounts[i]; 
     }
     //free(coords);
 }
 
+void scanlineAll (struct Coord *pParam, int pColores) {
+    int counter = 0;
+    int i;
 
+    for(i = 0; i < ptp; i++){
+
+        glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
+        
+        scanlineFill(vertexAmounts[i], pParam, plot, counter);
+        counter += vertexAmounts[i];
+    }
+}
 
 
 int main(int argc, char *argv[]){
@@ -684,14 +790,16 @@ int main(int argc, char *argv[]){
     gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
 
     readFiles();
-    drawBorders(coords, 1);
+    drawAllPolygonsBorders(coords, 1);
+    scanlineAll(coords, 1);
+    
     glFlush();
 
-    glutMouseFunc(mouse);
-    glutKeyboardFunc(processKeyPressed);
-    glutDisplayFunc(renderScene);
+    //glutMouseFunc(mouse);
+    //glutKeyboardFunc(processKeyPressed);
+    //glutDisplayFunc(renderScene);
     //glutIdleFunc(renderScene);
-    glutSpecialFunc(specialKeys);
+    //glutSpecialFunc(specialKeys);
 
     glutMainLoop();
 }
