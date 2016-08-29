@@ -1,0 +1,6 @@
+Pasos para operaciones múltiples.
+
+Se guardan los datos del universo en el puntero. 
+
+Se guarda una sola matriz que cada vez que se le opera se queda con el nuevo estado que se debe aplicar a todos los puntos. 
+
