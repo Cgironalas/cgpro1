@@ -24,6 +24,8 @@ struct Coord {
     double w;
 };
 
+
+
 static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
 static int ptp = 7;
 static int vertexAmounts[7];
@@ -36,6 +38,9 @@ typedef struct {
 } COLOR;
 
 COLOR **buffer;
+
+
+
 
 
 
@@ -57,6 +62,112 @@ void plot (int x, int y){
     glEnd();
 }
 
+
+void renderScene(void){
+
+    glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
+    drawBorders(coords, 0);
+    glFlush();
+    glutSwapBuffers();
+}
+
+void processKeyPressed(unsigned char key, int x, int y){
+
+
+
+    int modoTecla = glutGetModifiers();
+
+    switch (key){
+
+        case 43: //Se presiona + Zoom In
+
+            break;
+
+        case 45:  //Se presiona - Zoom Out
+
+
+            break;
+    }
+    if (modoTecla==GLUT_ACTIVE_SHIFT){
+            printf("Shift pressed\n");
+        }else{
+            printf("Good bye\n");
+            exit(0);    
+        }
+        
+}
+
+
+void mouse(int button, int state, int x, int y){
+
+    if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
+
+        if (state== GLUT_UP){
+            return;
+        }
+        int shiftPressed = glutGetModifiers();
+        if (shiftPressed==GLUT_ACTIVE_SHIFT){
+            
+            printf("Fast Scroll %s en (%d , %d ) \n", (button==3)? "Up":"Down", x, y);
+        }
+
+        printf("Scroll %s en (%d , %d ) \n", (button==3)? "Up":"Down", x, y);
+    }else{
+        printf("Mouse click %s en (%d , %d ) \n", (state==GLUT_DOWN)? "Down":"Up", x, y);
+    }
+}
+
+void specialKeys(int key, int x, int y){
+
+    int specialMode = glutGetModifiers();
+    int directionPan;
+    switch (key){
+
+        case GLUT_KEY_UP:
+            directionPan = 0;
+            printf("Panning up \n");
+            panning  (directionPan, specialMode);
+            break;
+
+        case GLUT_KEY_DOWN:
+            directionPan = 1;
+            printf("Panning down \n");
+            panning  (directionPan, specialMode);
+            break;
+
+        case GLUT_KEY_RIGHT:
+            directionPan = 2;
+            printf("Panning right \n");
+            panning  (directionPan, specialMode);
+            break;
+
+        case GLUT_KEY_LEFT:
+            directionPan = 3;
+            printf("Panning left \n");
+            panning (directionPan, specialMode);
+            break;
+    }
+}
+
+void panning(unsigned int directionPan , int specialMode){
+
+    if (specialMode == GLUT_ACTIVE_SHIFT){
+        panEntireScene(2, directionPan, 0.3);
+
+        printf("Fast panning \n");
+        
+    }else if (specialMode == GLUT_ACTIVE_CTRL){
+
+        printf("Slow panning \n");
+        panEntireScene(1, directionPan, 0.05);
+    }else{ //Modo normal
+        panEntireScene(0, directionPan, 0.125);
+    }
+}
+
+//Trazo de la línea entre dos puntos.
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     int d2x,d2y,dx,dy,d,
         Delta_N,Delta_NE,Delta_E,Delta_SE,
@@ -228,6 +339,116 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
+
+//Algoritmo de clipeo con los vértices de la línea pasados POR VALOR.
+void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, double edgeTop, double *x0, double *y0, double *x1, double *y1){
+
+    unsigned int p0Pos[4] = {0, 0 , 0, 0};
+    unsigned int p1Pos[4] = {0, 0 , 0, 0};
+    
+    for (int i = 0; i<4; i++){
+        switch(i){
+            case 0: //Left edge
+                if (*x0<edgeLeft){
+                    p0Pos[3]=1;
+                }
+
+                if (*x1<edgeLeft){
+                    p1Pos[3]=1;
+                }
+
+            case 1: //Right edge
+
+                if (*x0>edgeRight){
+                    p0Pos[2]=1;
+                }
+                if (*x1>edgeRight){
+                    p1Pos[2]=1;
+                }
+
+            case 2: //Bottom edge
+
+                if (*y0<edgeBottom){
+                    p0Pos[1]=1;
+                }
+                if (*y1<edgeBottom){
+
+                    p1Pos[1]=1;
+                }
+
+            case 3: //Top edge
+
+                if (*y0>edgeTop){
+                    p0Pos[0]=1;
+                }
+                if (*y0>edgeTop){
+
+                    p1Pos[0]=1;
+                }
+        }
+
+        //AND Operation of the vertexes of the line
+
+        unsigned int orResult[4] = {0, 0 , 0, 0};
+
+        for (i=0;i<4;i++){
+            if(p0Pos[i]+p1Pos[i]==2){
+                return; //Trivially rejected.
+            }else if (p0Pos[i]+p1Pos[i]==1){
+                orResult[i]=1; //Two shots at once, let's make OR operation.
+            }
+        }
+        
+        if (orResult[0]==0 && orResult[1]==0 && orResult[2]==0 && orResult[3]==0 ){
+            return; //Trivially accepted.
+        }else{
+            double m = ((*y1 - *y0)/(*x1- *x0));
+            double b = *y0 -(m)*(*x0);
+            //We calculate these values right now.
+
+            if (orResult[0]==1){ //Top Edge intersection.
+                if (p0Pos[0]==1){ //If the source point was outside
+                    *x0 = (edgeTop - b)/m;
+                    *y1=edgeTop;
+                }else{ //Or the destiny point
+                    *x1 = (edgeTop - b)/m;
+                    *y1=edgeTop;
+                }
+            }
+            if(orResult[1]==1){ //Bottom Edge intersection.
+                if (p0Pos[1]==1){ ///If the source point was outside
+                   *x0 = (edgeBottom - b)/m;
+                   *y0=edgeBottom;
+                }else{ //Or the destiny point
+                    *x1 = (edgeBottom - b)/m;
+                    *y1=edgeBottom;
+                }
+            }
+            if(orResult[2]==1){ //Right Edge intersection.
+                if (p0Pos[2]==1){ //If the source point was outside
+                    *y0 = m*(edgeRight) + b;
+                    *x0=edgeRight;
+                }else{ //Or the destiny point
+                    *y1 = m*(edgeRight) + b;
+                    *x1=edgeRight;
+                }
+            }
+            if(orResult[3]==1){ //Left Edge intersection.
+                if (p0Pos[2]==1){ //If the source point was outside
+                    *y0 = m*(edgeLeft) + b;
+                    *x0=edgeLeft;
+                }else{ //Or the destiny point
+                    *y1 = m*(edgeLeft) + b;
+                    *x1=edgeLeft;
+                }
+            }
+        }
+
+
+    }
+}
+
+
 void calculateMinMax(int vertexAmount){
     int i;
     Xmin = min(coords[0].longitud, coords[1].longitud);
@@ -242,6 +463,59 @@ void calculateMinMax(int vertexAmount){
         Ymax = max(Ymax, coords[i].latitud);
     }
 }
+
+
+/*
+    mode{0==NORMAL, 1 slow y 2 fast}
+    direction {0 = up, 1 = down, 2= right, 3 = left}
+    0.0 percentage < 1.0 para evitar división
+*/
+void panEntireScene(unsigned int mode, unsigned int direction, double percentage){
+
+    if (direction== 2 || direction==3){ //ES paneo horizontal
+        
+        double xDelta=Xmax-Xmin;
+
+        if (direction==2){ //Es para la derecha
+
+            Xmax-= xDelta * percentage;
+            Xmin-= xDelta * percentage;
+
+        }else{ //Es para la izquierda
+
+            Xmax+= xDelta * percentage;
+            Xmin+= xDelta * percentage;
+        }
+
+    }else{//Es paneo vertical
+        
+        double yDelta = Ymax-Ymin;
+        if (direction==0){ //Es para arriba
+
+            Ymax-= yDelta * percentage;
+            Ymin-= yDelta * percentage;
+        }else{ //Es para abajo
+
+            Ymax+= yDelta * percentage;
+            Ymin+= yDelta * percentage;
+        }
+    } 
+     
+    renderScene();
+}
+
+/*
+    mode{0==NORMAL, 1 slow y 2 fast}
+    direction {0 = Zoom Out, 1 = Zoom In }
+*/
+void zoomScene(unsigned int mode, unsigned int direction){
+
+    
+
+
+    glutDisplayFunc(renderScene);
+}
+
 
 void paintPolygon(int vertexAmount, struct Coord *coords, void (*f)(int,int), int counter){
     int i;
@@ -260,6 +534,10 @@ void paintPolygon(int vertexAmount, struct Coord *coords, void (*f)(int,int), in
     bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
 }
 
+
+
+
+//Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
 void readFiles(){
 
     char *provinces[7] = {"mapa/Puntarenas.txt",
@@ -331,18 +609,27 @@ void drawBorders (struct Coord *pParam, int pColores) {
 }
 
 
+
+
 int main(int argc, char *argv[]){
     buffer = (COLOR **)malloc(res * sizeof(COLOR*));
     
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(res,res);
-    glutCreateWindow("CG Proyecto 0");
+    glutCreateWindow("CG Proyecto 1");
     glClear(GL_COLOR_BUFFER_BIT);
     gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
 
     readFiles();
     drawBorders(coords, 1);
     glFlush();
+
+    glutMouseFunc(mouse);
+    glutKeyboardFunc(processKeyPressed);
+    glutDisplayFunc(renderScene);
+    glutIdleFunc(renderScene);
+    glutSpecialFunc(specialKeys);
+
     glutMainLoop();
 }
