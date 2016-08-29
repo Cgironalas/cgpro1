@@ -9,7 +9,7 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 
-static int res = 800;
+static int res = 500;
 static double Xmin;
 static double Xmax;
 static double Ymin;
@@ -24,14 +24,14 @@ struct Coord {
 };
 
 struct Border {
-    double x0;
-    double x1;
-    double y0;
-    double y1;
+    int x0;
+    int x1;
+    int y0;
+    int y1;
     
     double d;
     int activated;
-    double inc;
+    int inc;
 };
 
 
@@ -65,17 +65,6 @@ void plot (int x, int y){
     glBegin (GL_POINTS);
     glVertex2i (x,y);
     glEnd();
-}
-
-
-void renderScene(void){
-
-    glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
-    drawAllPolygonsBorders(coords, 0);
-    glFlush();
-    glutSwapBuffers();
 }
 
 //////////////////TROYO...
@@ -601,7 +590,7 @@ int localMinMax(int y, struct Border firstB, struct Border lastB){
 
 
 void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter) {
-    int i,x;
+    int i,x,j,a;
     int vertexAmount2 = vertexAmount;
     int Yf[vertexAmount];
     int Xf[vertexAmount];
@@ -609,14 +598,17 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
 
     int rsba = vertexAmount; //Real size of the border array 
     int ignored = 0;
+    int pos = 0;
+    int active = 0;
     
     //Mapeo a puntos del framebuffer. 
     for(i = 0; i < vertexAmount; i++){
         Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
         Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+        //printf("(%i,%i)\n",Xf[i],Yf[i]);
     }
 
-    //Calculation of the real size. 
+    //Calculation of the real size or the border array. =======
     for(i = 0; i < vertexAmount; i++){ 
         if ((Yf[i+1] - Yf[i]) == 0) {
             rsba --; //The borders to be ignored. 
@@ -624,17 +616,19 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
     }
 
     borders = malloc(sizeof(struct Border)*rsba);
-    
-    printf("%i\n", rsba);
+    // ========================================================
 
-    for(i = 1; i <= vertexAmount; i++){ //Loops over the full size because it'll ignore horizontal borders again
+    //Saves borders in array.====
+    for(i = 1; i < vertexAmount; i++){ //Dont even save horizontal borders
         x = i-ignored;
-        if ((Yf[x] - Yf[x-1]) != 0) {
-            borders[x-1].x0 = Xf[x-1];
-            borders[x-1].y0 = Yf[x-1]; 
-            borders[x-1].x1 = Xf[x];
-            borders[x-1].y1 = Yf[x];
-            borders[x-1].d = ((double)Xf[i] + Xf[i+1]) / (Yf[i+1] - Yf[i]);
+
+        if ((Yf[i] - Yf[i-1]) != 0) {
+//        	printf("(%i,%i),(%i,%i)\n",Xf[i-1],Yf[i-1],Xf[i],Yf[i]);
+            borders[x-1].x0 = Xf[i-1];
+            borders[x-1].y0 = Yf[i-1]; 
+            borders[x-1].x1 = Xf[i];
+            borders[x-1].y1 = Yf[i];
+            borders[x-1].d = ((double)Xf[i-1]) - Xf[i] / (Yf[i] - Yf[i-1]);
             borders[x-1].activated = 0; //They all start deactivated
             borders[x-1].inc = 0; 
         }
@@ -643,33 +637,100 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
         }
     }   
 
-    if ((Yf[x] - Yf[x-1]) != 0) {
-        borders[x-1].x0 = Xf[x-1];
-        borders[x-1].y0 = Yf[x-1]; 
+    if ((Yf[0] - Yf[i-1]) != 0) {
+//    	printf("(%i,%i),(%i,%i)\n",Xf[i-1],Yf[i-1],Xf[i],Yf[i]);
+        borders[x-1].x0 = Xf[i-1];
+        borders[x-1].y0 = Yf[i-1]; 
         borders[x-1].x1 = Xf[0];
         borders[x-1].y1 = Yf[0];
-        borders[x-1].d = ((double)Xf[i] + Xf[i+1]) / (Yf[i+1] - Yf[i]);
+        borders[x-1].d = ((double)Xf[i-1] - Xf[0]) / (Yf[0] - Yf[i-1]);
         borders[x-1].activated = 0; //They all start deactivated
         borders[x-1].inc = 0; 
     }
-
-    for (i=0;i<rsba;i++){
-        printf("(%f,%f) a (%f,%f)\n", borders[i].x0, borders[i].y0, borders[i].x1, borders[i].y1);
-    }
+    // ========================================================
 
     // Algoritmo principal. 
-    while (scanline >= Ymin) {
+    while (scanline >= 0) {
         //Activar bordes
-        for (i = 0; i < vertexAmount; i++) {
-
+        for (i = 0; i < rsba; i++) {
+        	if (borders[i].activated == 0) {
+        		//Check high y equal to scanline
+        		if ( borders[i].y0 == scanline ) {
+        			//printf("y0, %f\n", borders[i].y0);
+        			//printf("(%f,%f) a (%f,%f)\n", borders[i].x0, borders[i].y0, borders[i].x1, borders[i].y1);
+        			borders[i].activated = 1;
+        			borders[i].inc = borders[i].x0;
+	        		active+=1;
+        		}
+        		else if (borders[i].y1 == scanline){
+        			//printf("y1, %f\n", borders[i].y1);
+        			//printf("(%f,%f) a (%f,%f)\n", borders[i].x0, borders[i].y0, borders[i].x1, borders[i].y1);
+					borders[i].activated = 1;
+					borders[i].inc = borders[i].x1;	
+					active+=1;
+        		}
+        	}
         }
-        //Ordenar intersecciones 
+
+        //Guardar intersecciones
+		int intersectionsX[active];
+        pos = 0;
+        for (i = 0; i < rsba; i++) {
+        	if ( borders[i].activated == 1 ) {
+        		//printf("%i\n", borders[i].inc);
+	        	intersectionsX[i-pos] = borders[i].inc;
+        	}
+        	else {
+        		pos+=1;
+        	}
+        }
+        
+        //Ordenar intersecciones.
+		for (i = 0; i < active; ++i){
+        	for (j = i + 1; j < active; ++j){
+            	if (intersectionsX[i] > intersectionsX[j]){
+                	a =  intersectionsX[i];
+	                intersectionsX[i] = intersectionsX[j];
+	                intersectionsX[j] = a;
+	            }
+        	}
+    	}
+		
+		for (i = 0; i < active; ++i){
+//    		printf("%i\n", intersectionsX[i]);
+	    }    	
 
         //Pintar de dos en dos
+        for (i = 1; i < active; i++){ 
+        	if (i%2!=0){
+//        		printf("(%i,%i),(%i,%i)\n",intersectionsX[i-1],scanline,intersectionsX[i],scanline);	
+        		drawHorLine(intersectionsX[i-1], intersectionsX[i], scanline);
+        	}
+        	
+    	}
 
         //Activos += -1/m
+		for (i = 0; i < rsba; i++) {
+        	if ( borders[i].activated == 1 ) {
+        		borders[i].inc += borders[i].d ;
+        	}
+        }
+
+        for (i = 0; i < rsba; i++) {
+        	if ( borders[i].activated == 1 ) {
+  //      		printf("%i\n", borders[i].inc);
+        	}
+        }
 
         //Desactivar bordes
+        for (i = 0; i < rsba; i++) {
+        	if ( borders[i].y0 > scanline && borders[i].y1 > scanline ) {
+//        		printf("dea");
+        		borders[i].activated == 0;
+        		active--;
+        	}
+        }
+
         scanline--;
     }
 }
@@ -691,14 +752,11 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
     bresenham(Xf[vertexAmount-1], Yf[vertexAmount-1], Xf[0], Yf[0], (*f));
 }
 
-
-
-
 //Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
 void readFiles(){
 
-    char *provinces[8] = {"mapa/figura_p1.txt",
-                          "mapa/Puntarenas.txt",
+    char *provinces[8] = {"mapa/Puntarenas.txt",
+                          "mapa/figura_p1.txt",
                           "mapa/Alajuela.txt",
                           "mapa/Limon.txt", 
                           "mapa/SanJose.txt",
@@ -778,21 +836,30 @@ void scanlineAll (struct Coord *pParam, int pColores) {
     }
 }
 
+void renderScene(void){
+
+    glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
+    drawAllPolygonsBorders(coords, 0);
+    glFlush();
+    glutSwapBuffers();
+}
 
 int main(int argc, char *argv[]){
     buffer = (COLOR **)malloc(res * sizeof(COLOR*));
     
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
     glutInitWindowSize(res,res);
     glutCreateWindow("CG Proyecto 1");
     glClear(GL_COLOR_BUFFER_BIT);
     gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
 
     readFiles();
-    drawAllPolygonsBorders(coords, 1);
+    //drawAllPolygonsBorders(coords, 1);
     scanlineAll(coords, 1);
-    
+
     glFlush();
 
     //glutMouseFunc(mouse);
