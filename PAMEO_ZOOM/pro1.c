@@ -67,36 +67,10 @@ void renderScene(void){
 
     glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
+    printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf \n", Xmin, Ymin, Xmax, Ymax);
     drawBorders(coords, 0);
     glFlush();
     glutSwapBuffers();
-}
-
-void processKeyPressed(unsigned char key, int x, int y){
-
-
-
-    int modoTecla = glutGetModifiers();
-
-    switch (key){
-
-        case 43: //Se presiona + Zoom In
-
-            break;
-
-        case 45:  //Se presiona - Zoom Out
-
-
-            break;
-    }
-    if (modoTecla==GLUT_ACTIVE_SHIFT){
-            printf("Shift pressed\n");
-        }else{
-            printf("Good bye\n");
-            exit(0);    
-        }
-        
 }
 
 
@@ -115,9 +89,33 @@ void mouse(int button, int state, int x, int y){
 
         printf("Scroll %s en (%d , %d ) \n", (button==3)? "Up":"Down", x, y);
     }else{
-        printf("Mouse click %s en (%d , %d ) \n", (state==GLUT_DOWN)? "Down":"Up", x, y);
+        //printf("Mouse click %s en (%d , %d ) \n", (state==GLUT_DOWN)? "Down":"Up", x, y);
     }
 }
+
+
+void processKeyPressed(unsigned char key, int x, int y){
+
+
+
+    int modoTecla = glutGetModifiers();
+
+    switch (key){
+
+        case 97: //Se presiona a Zoom In
+            zooming(1,modoTecla);
+            break;
+
+        case 100:  //Se presiona d Zoom Out
+            zooming(1,modoTecla);
+            break;
+    }
+
+        
+}
+
+
+
 
 void specialKeys(int key, int x, int y){
 
@@ -148,6 +146,14 @@ void specialKeys(int key, int x, int y){
             printf("Panning left \n");
             panning (directionPan, specialMode);
             break;
+        case GLUT_KEY_F11: //Se presiona a Zoom In
+            zooming(1,specialMode);
+            break;
+
+        case GLUT_KEY_F12:  //Se presiona d Zoom Out
+            zooming(0,specialMode);
+            break;
+
     }
 }
 
@@ -185,34 +191,36 @@ void zooming(unsigned int typeZoom, int specialMode){
     if (specialMode == GLUT_ACTIVE_SHIFT){
         if (typeZoom==0){
         z  = 3;
-            zoomScene(directionPan, z); //Zoom out
+            zoomScene(typeZoom, z); //Zoom out
         }else {
-            zoomScene(directionPan, 1/z);   //Zoom in 
+            z=1/z;
+            zoomScene(typeZoom, z);   //Zoom in 
         }
         
         printf("Fast zooming \n");
         
     }else if (specialMode == GLUT_ACTIVE_CTRL){
 
-        z=1.5
+        z=1.5;
         printf("Slow zooming \n");
         if (typeZoom==0){ //Zoom out
-            zoomScene(directionPan, z);
+            zoomScene(typeZoom, z);
         }else { //Zoom in |
-            zoomScene(directionPan, 1/z);    
+            zoomScene(typeZoom, 1/z);    
         }
     }else{ //Modo normal
 
         z=2;
         if (typeZoom==0){  //Zoom out
-            zoomScene(directionPan, z);
+            zoomScene(typeZoom, z);
         }else {
-            zoomScene(directionPan, 1/Z);    
+            z = 1/z;
+            zoomScene(typeZoom, z);    
         }
     }
 
+}
 
-sÍ
 /*
     mode{0==NORMAL, 1 slow y 2 fast}
     direction {0 = up, 1 = down, 2= right, 3 = left}
@@ -259,20 +267,24 @@ void panEntireScene(unsigned int direction, double percentage){
 void zoomScene(double percentage){
 
     //Cálculo del punto central de la ventana actual
-    double xCenter = (double)(Xmax-Xmin)/2;
-    double xCenter = (double)(Ymax-Ymin)/2;
+    double xCenter = (Xmax-Xmin)/2;
+    double yCenter = (Ymax-Ymin)/2;
 
-    Xmin=;
-    Ymax=;
-    Xmax=;
-    Ymax=;
+    xCenter+=Xmin;
+    yCenter+=Ymin;
 
+    Xmin= ((Xmin-xCenter)*percentage)+xCenter;
+    Ymin=((Ymin-yCenter)*percentage)+yCenter;
+    Xmax=((Xmax-xCenter)*percentage)+xCenter;
+    Ymax=((Ymax-yCenter)*percentage)+yCenter;
 
+    printf("Centro: (%f, %f) \n", xCenter,yCenter);
+    printf("Zoom con escala %f \n", percentage);
 
     
 
 
-    glutDisplayFunc(renderScene);
+    renderScene();
 }
 
 
