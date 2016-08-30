@@ -172,32 +172,31 @@ void zooming(unsigned int typeZoom, int specialMode){
     double z;
 
     if (specialMode == GLUT_ACTIVE_SHIFT){
-        if (typeZoom==0){
         z  = 3;
-            zoomScene(typeZoom, z); //Zoom out
+        if (typeZoom==0){
+        
+            zoomScene(typeZoom, 1.0/z); //Zoom out
         }else {
-            z=1/z;
             zoomScene(typeZoom, z);   //Zoom in 
         }
         
         printf("Fast zooming \n");
         
-    }else if (specialMode == GLUT_ACTIVE_CTRL){
+    }else if (specialMode == GLUT_KEY_F3){
 
         z=1.5;
         printf("Slow zooming \n");
         if (typeZoom==0){ //Zoom out
-            zoomScene(typeZoom, z);
+            zoomScene(typeZoom, 1.0/z);
         }else { //Zoom in |
-            zoomScene(typeZoom, 1/z);    
+            zoomScene(typeZoom, z);    
         }
     }else{ //Modo normal
 
         z=2;
         if (typeZoom==0){  //Zoom out
-            zoomScene(typeZoom, z);
+            zoomScene(typeZoom, 1.0/z);
         }else {
-            z = 1/z;
             zoomScene(typeZoom, z);    
         }
     }
@@ -240,7 +239,7 @@ void panEntireScene(unsigned int direction, double percentage){
         }
     } 
      
-    renderScene();
+    //renderScene();
 }
 
 /*
@@ -267,7 +266,7 @@ void zoomScene(double percentage){
     
 
 
-    renderScene();
+    //renderScene();
 }
 
 
@@ -774,7 +773,7 @@ int main(int argc, char *argv[]){
     glutMouseFunc(mouse);
     glutKeyboardFunc(processKeyPressed);
     glutDisplayFunc(renderScene);
-    //glutIdleFunc(renderScene);
+    glutIdleFunc(renderScene); //Llama a renderScene cuando el glut no tiene comandos en buffer;
     glutSpecialFunc(specialKeys);
 
     glutMainLoop();
