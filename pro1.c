@@ -77,9 +77,126 @@ void mouse(int button, int state, int x, int y){
 }
 
 
+/*
+    mode{0==NORMAL, 1 slow y 2 fast}
+    direction {0 = up, 1 = down, 2= right, 3 = left}
+    0.0 percentage < 1.0 para evitar división
+*/
+void panEntireScene(unsigned int direction, double percentage){
+    if (direction== 2 || direction==3){ //Es paneo horizontal
+        double xDelta=Xmax-Xmin;
+        if (direction==2){ //Es para la derecha
+            Xmax-= xDelta * percentage;
+            Xmin-= xDelta * percentage;
+        }else{ //Es para la izquierda
+
+            Xmax+= xDelta * percentage;
+            Xmin+= xDelta * percentage;
+        }
+    }else{//Es paneo vertical
+        
+        double yDelta = Ymax-Ymin;
+        if (direction==0){ //Es para arriba
+
+            Ymax-= yDelta * percentage;
+            Ymin-= yDelta * percentage;
+        }else{ //Es para abajo
+
+            Ymax+= yDelta * percentage;
+            Ymin+= yDelta * percentage;
+        }
+    }      
+    //renderScene();
+}
+
+
+/*
+    directionPan {0 = up, 1 = down, 2= right, 3 = left}
+    specialMode = tecla de modo.
+*/
+void panning(unsigned int directionPan , int specialMode){
+
+    if (specialMode == GLUT_ACTIVE_SHIFT){
+        {}
+        panEntireScene(directionPan, 0.3);
+
+        printf("Fast panning \n");
+        
+    }else if (specialMode == GLUT_ACTIVE_CTRL){
+
+        printf("Slow panning \n");
+        panEntireScene(directionPan, 0.05);
+    }else{ //Modo normal
+        panEntireScene(directionPan, 0.125);
+    }
+}
+
+
+
+void zoomScene(double percentage){
+
+    //Cálculo del punto central de la ventana actual
+    double xCenter = (Xmax-Xmin)/2;
+    double yCenter = (Ymax-Ymin)/2;
+
+    xCenter+=Xmin;
+    yCenter+=Ymin;
+
+    Xmin= ((Xmin-xCenter)*percentage)+xCenter;
+    Ymin=((Ymin-yCenter)*percentage)+yCenter;
+    Xmax=((Xmax-xCenter)*percentage)+xCenter;
+    Ymax=((Ymax-yCenter)*percentage)+yCenter;
+
+    printf("Centro: (%f, %f) \n", xCenter,yCenter);
+    printf("Zoom con escala %f \n", percentage);
+    
+    //renderScene();
+}
+
+/*
+    typeZoom{0 = Zoom Out, 1 = Zoom In }
+    specialMode = tecla de modo.
+*/
+void zooming(unsigned int typeZoom, int specialMode){
+    
+    double z;
+
+    if (specialMode == GLUT_ACTIVE_SHIFT){
+        z  = 3;
+        if (typeZoom==0){        
+            zoomScene(1/z); //Zoom out
+        }else {
+            zoomScene(z);   //Zoom in 
+        }
+        
+        printf("Fast zooming \n");
+        
+    }else if (specialMode == GLUT_ACTIVE_CTRL){
+
+        z=1.5;
+        printf("Slow zooming \n");
+        if (typeZoom==0){ //Zoom out
+            zoomScene(1/z);
+        }else { //Zoom in 
+            zoomScene(z);    
+        }
+    }else{ //Modo normal
+
+        z=2;
+        if (typeZoom==0){  //Zoom out
+            zoomScene(1/z);
+        }else {
+            zoomScene(z);    
+        }
+    }
+
+}
+
+/*
+    mode{0==NORMAL, 1 slow y 2 fast}
+    direction {0 = Zoom Out, 1 = Zoom In }
+*/
 void processKeyPressed(unsigned char key, int x, int y){
-
-
 
     int modoTecla = glutGetModifiers();
 
@@ -92,13 +209,8 @@ void processKeyPressed(unsigned char key, int x, int y){
         case 100:  //Se presiona d Zoom Out
             zooming(1,modoTecla);
             break;
-    }
-
-        
+    }        
 }
-
-
-
 
 void specialKeys(int key, int x, int y){
 
@@ -136,138 +248,10 @@ void specialKeys(int key, int x, int y){
         case GLUT_KEY_F12:  //Se presiona d Zoom Out
             zooming(0,specialMode);
             break;
-
     }
 }
 
 
-/*
-    directionPan {0 = up, 1 = down, 2= right, 3 = left}
-    specialMode = tecla de modo.
-*/
-void panning(unsigned int directionPan , int specialMode){
-
-    if (specialMode == GLUT_ACTIVE_SHIFT){
-        {}
-        panEntireScene(2, directionPan, 0.3);
-
-        printf("Fast panning \n");
-        
-    }else if (specialMode == GLUT_ACTIVE_CTRL){
-
-        printf("Slow panning \n");
-        panEntireScene(1, directionPan, 0.05);
-    }else{ //Modo normal
-        panEntireScene(0, directionPan, 0.125);
-    }
-}
-
-
-/*
-    typeZoom{0 = Zoom Out, 1 = Zoom In }
-    specialMode = tecla de modo.
-*/
-void zooming(unsigned int typeZoom, int specialMode){
-    
-    double z;
-
-    if (specialMode == GLUT_ACTIVE_SHIFT){
-        z  = 3;
-        if (typeZoom==0){
-        
-            zoomScene(typeZoom, 1.0/z); //Zoom out
-        }else {
-            zoomScene(typeZoom, z);   //Zoom in 
-        }
-        
-        printf("Fast zooming \n");
-        
-    }else if (specialMode == GLUT_KEY_F3){
-
-        z=1.5;
-        printf("Slow zooming \n");
-        if (typeZoom==0){ //Zoom out
-            zoomScene(typeZoom, 1.0/z);
-        }else { //Zoom in |
-            zoomScene(typeZoom, z);    
-        }
-    }else{ //Modo normal
-
-        z=2;
-        if (typeZoom==0){  //Zoom out
-            zoomScene(typeZoom, 1.0/z);
-        }else {
-            zoomScene(typeZoom, z);    
-        }
-    }
-
-}
-
-/*
-    mode{0==NORMAL, 1 slow y 2 fast}
-    direction {0 = up, 1 = down, 2= right, 3 = left}
-    0.0 percentage < 1.0 para evitar división
-*/
-void panEntireScene(unsigned int direction, double percentage){
-
-    if (direction== 2 || direction==3){ //ES paneo horizontal
-        
-        double xDelta=Xmax-Xmin;
-
-        if (direction==2){ //Es para la derecha
-
-            Xmax-= xDelta * percentage;
-            Xmin-= xDelta * percentage;
-
-        }else{ //Es para la izquierda
-
-            Xmax+= xDelta * percentage;
-            Xmin+= xDelta * percentage;
-        }
-
-    }else{//Es paneo vertical
-        
-        double yDelta = Ymax-Ymin;
-        if (direction==0){ //Es para arriba
-
-            Ymax-= yDelta * percentage;
-            Ymin-= yDelta * percentage;
-        }else{ //Es para abajo
-
-            Ymax+= yDelta * percentage;
-            Ymin+= yDelta * percentage;
-        }
-    } 
-     
-    //renderScene();
-}
-
-/*
-    mode{0==NORMAL, 1 slow y 2 fast}
-    direction {0 = Zoom Out, 1 = Zoom In }
-*/
-void zoomScene(double percentage){
-
-    //Cálculo del punto central de la ventana actual
-    double xCenter = (Xmax-Xmin)/2;
-    double yCenter = (Ymax-Ymin)/2;
-
-    xCenter+=Xmin;
-    yCenter+=Ymin;
-
-    Xmin= ((Xmin-xCenter)*percentage)+xCenter;
-    Ymin=((Ymin-yCenter)*percentage)+yCenter;
-    Xmax=((Xmax-xCenter)*percentage)+xCenter;
-    Ymax=((Ymax-yCenter)*percentage)+yCenter;
-
-    printf("Centro: (%f, %f) \n", xCenter,yCenter);
-    printf("Zoom con escala %f \n", percentage);
-
-    
-
-
-    //renderScene();
-}
 
 
 //Trazo de la línea entre dos puntos.
@@ -747,7 +731,7 @@ void renderScene(void){
 
     glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
+    //printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
     allScanlines(coords, 1);
     allBorders(coords, 1);
     glFlush();
