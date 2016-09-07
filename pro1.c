@@ -9,13 +9,20 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 
-static int res = 600;
+static int resX = 600;
+static int resY;
+
 static double Xmin;
 static double Xmax;
 static double Ymin;
 static double Ymax;
+
 static int provinceCounter = 0;
 static int totalVertexCount = 0;
+
+static int *texels;
+static char **texelsHex;
+static int width, height;
 
 struct Coord {
     double longitud;
@@ -37,6 +44,10 @@ typedef struct {
 
 COLOR **buffer;
 
+void calculateResY(){
+    resY = (int) (resX * (Ymax - Ymin)) / (Xmax - Xmin);
+}
+
 double min(double a, double b){
     if(a < b) { return a; }
     else { return b; }
@@ -54,8 +65,6 @@ void plot (int x, int y){
     glVertex2i (x,y);
     glEnd();
 }
-
-
 
 void mouse(int button, int state, int x, int y){
 
@@ -75,7 +84,6 @@ void mouse(int button, int state, int x, int y){
         //printf("Mouse click %s en (%d , %d ) \n", (state==GLUT_DOWN)? "Down":"Up", x, y);
     }
 }
-
 
 /*
     mode{0==NORMAL, 1 slow y 2 fast}
@@ -109,7 +117,6 @@ void panEntireScene(unsigned int direction, double percentage){
     //renderScene();
 }
 
-
 /*
     directionPan {0 = up, 1 = down, 2= right, 3 = left}
     specialMode = tecla de modo.
@@ -130,8 +137,6 @@ void panning(unsigned int directionPan , int specialMode){
         panEntireScene(directionPan, 0.125);
     }
 }
-
-
 
 void zoomScene(double percentage){
 
@@ -189,7 +194,6 @@ void zooming(unsigned int typeZoom, int specialMode){
             zoomScene(z);    
         }
     }
-
 }
 
 /*
@@ -250,9 +254,6 @@ void specialKeys(int key, int x, int y){
             break;
     }
 }
-
-
-
 
 //Trazo de la línea entre dos puntos.
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
@@ -426,7 +427,6 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
-
 //Algoritmo de clipeo con los vértices de la línea pasados POR VALOR.
 void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, double edgeTop, double *x0, double *y0, double *x1, double *y1){
 
@@ -535,7 +535,6 @@ void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, doubl
     }
 }
 
-
 void calculateMinMax(int vertexAmount){
     int i;
     Xmin = min(coords[0].longitud, coords[1].longitud);
@@ -549,11 +548,79 @@ void calculateMinMax(int vertexAmount){
         Ymin = min(Ymin, coords[i].latitud);
         Ymax = max(Ymax, coords[i].latitud);
     }
+    calculateResY();
+}
+
+int hexToDec(char *pHex){
+    return (int)strtol(pHex, NULL, 16);
+}
+
+void getTexels(){
+    int counter, i;
+    char w[8];
+    char h[8];
+    char hex[8];
+    FILE* file = fopen("mona.AVS", "r");
+    //Read width and height
+    fscanf(file, "%s", &w[0]);
+    fscanf(file, "%s", &w[4]);
+    fscanf(file, "%s", &h[0]);
+    fscanf(file, "%s", &h[4]);
+ 
+    width = hexToDec(w);
+    height = hexToDec(h);
+    printf("Ancho %i, Alto %i\n", width, height);
+
+    int totalPixels = width*height;
+    //char texelHex[totalPixels][6];
+    texels = malloc(sizeof(int) * totalPixels);
+    texelsHex = malloc(sizeof(char * ) * totalPixels);
+
+    for(i = 0; i < totalPixels; i++){
+        texelsHex[i] = malloc(sizeof(char) * 6);
+    }
+
+    for(i = 0; i < totalPixels; i++){
+        fscanf(file, "%s", &hex[0]);
+        fscanf(file, "%s", &hex[4]);
+
+        texelsHex[i][0] = hex[2];
+        texelsHex[i][1] = hex[3];
+        texelsHex[i][2] = hex[4];
+        texelsHex[i][3] = hex[5];
+        texelsHex[i][4] = hex[6];
+        texelsHex[i][5] = hex[7];
+
+        texels[i] = hexToDec(texelsHex[i]);
+        //printf("%s\n", texelsHex[i]);
+    }
 }
 
 void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bresenham.
     int i;
+    int posY = y % height;
     for (i = x0; i < x1; i++){
+        int posX = i % width;
+        int place = posX * posY;
+
+        char rHex[2] = {texelsHex[place][0], texelsHex[place][1]};
+        char gHex[2] = {texelsHex[place][2], texelsHex[place][3]};
+        char bHex[2] = {texelsHex[place][4], texelsHex[place][5]};
+
+        int tex = texels[place];
+        int rValue = ((tex >> 16) & 0xFF);
+        int gValue = ((tex >> 8 ) & 0xFF);
+        int bValue = ((tex) & 0xFF);
+
+        //int rValue = hexToDec(rHex);
+        //int gValue = hexToDec(gHex);
+        //int bValue = hexToDec(bHex);
+
+        double rColor = ((double)(rValue) / 255.0);
+        double gColor = ((double)(gValue) / 255.0);
+        double bColor = ((double)(bValue) / 255.0);
+        
+        glColor3f(rColor,gColor,bColor);
         plot(i,y);
     }
 }
@@ -561,7 +628,7 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
 void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter) {
 
 	int i,j,active,dy,dx,temp;
-	int scanline = res;
+	int scanline = resY;
 
 	int xi[vertexAmount+1];
 	int Yf[vertexAmount+1];
@@ -571,8 +638,8 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
    
     //Mapeo a puntos del framebuffer. 
     for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
-        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+        Yf[i] = (int) (resY * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
+        Xf[i] = (int) (resX * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
     }
 
     Xf[vertexAmount] = Xf[0];
@@ -633,8 +700,8 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
     int Xf[vertexAmount+1];
 
     for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin))); 
-        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin))); 
+        Yf[i] = (int) (resY * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin))); 
+        Xf[i] = (int) (resX * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin))); 
     }
 
     Yf[vertexAmount] = Yf[0];
@@ -739,16 +806,19 @@ void renderScene(void){
 }
 
 int main(int argc, char *argv[]){
-    buffer = (COLOR **)malloc(res * sizeof(COLOR*));
+    getTexels();
+
+    buffer = (COLOR **)malloc(resX * sizeof(COLOR*));
     
+    readFiles();
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-    glutInitWindowSize(res,res);
+    glutInitWindowSize(resX,resY);
     glutCreateWindow("CG Proyecto 1");
     glClear(GL_COLOR_BUFFER_BIT);
-    gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
+    gluOrtho2D(-0.5, resX +0.5, -0.5, resY + 0.5);
 
-    readFiles();
     allScanlines(coords, 1);
     allBorders(coords, 1);
 
