@@ -123,10 +123,10 @@ void panEntireScene(unsigned int direction, double percentage){
 */
 void panning(unsigned int directionPan , int specialMode){
 
+    //printf("%i \n", specialMode);
+            
     if (specialMode == GLUT_ACTIVE_SHIFT){
-        {}
         panEntireScene(directionPan, 0.3);
-
         printf("Fast panning \n");
         
     }else if (specialMode == GLUT_ACTIVE_CTRL){
@@ -530,8 +530,6 @@ void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, doubl
                 }
             }
         }
-
-
     }
 }
 
@@ -551,8 +549,7 @@ void calculateMinMax(int vertexAmount){
     calculateResY();
 }
 
-int hexToDec(char *pHex){
-    
+int hexToDec(char *pHex){    
     return (int)strtol(pHex, NULL, 16);
 }
 
@@ -562,6 +559,7 @@ void getTexels(){
     char h[8];
     char hex[8];
     FILE* file = fopen("mona.AVS", "r");
+    
     //Read width and height
     fscanf(file, "%s", &w[0]);
     fscanf(file, "%s", &w[4]);
@@ -570,35 +568,31 @@ void getTexels(){
  
     width = hexToDec(w);
     height = hexToDec(h);
-    printf("Ancho %i, Alto %i\n", width, height);
+    //printf("Ancho %i, Alto %i\n", width, height);
 
-    texels = malloc(sizeof(int * ) * width);
-    for(x = 0; x < width; x++){
-        texels[x] = malloc(sizeof(int) * height);
+    texels = malloc(sizeof(int * ) * height);
+    for(y = 0; y < height; y++){
+        texels[y] = malloc(sizeof(int) * width);
     }
 
-    texelsHex = malloc(sizeof(char ** ) * width);
-
-    for(x = 0; x < width; x++){
-        texelsHex[x] = malloc(sizeof(char * ) * height);
-        for(y = 0; y < height; y++){
-            texelsHex[x][y] = malloc(sizeof(char) * 6);
+    texelsHex = malloc(sizeof(char ** ) * height);
+    for(y = 0; y < height; y++){
+        texelsHex[y] = malloc(sizeof(char * ) * width);
+        for(x = 0; x < width; x++){
+            texelsHex[y][x] = malloc(sizeof(char) * 6);
         }
     }
 
-    for(x = 0; x < width; x++){
-        for(y = 0; y < height; y++){
+    for(y = height-1; y >= 0; y--){
+        for(x = 0; x < width; x++){
             fscanf(file, "%s", &hex[0]);
             fscanf(file, "%s", &hex[4]);
 
-            texelsHex[x][y][0] = hex[2];
-            texelsHex[x][y][1] = hex[3];
-            texelsHex[x][y][2] = hex[4];
-            texelsHex[x][y][3] = hex[5];
-            texelsHex[x][y][4] = hex[6];
-            texelsHex[x][y][5] = hex[7];
+            texelsHex[y][x][0] = hex[2]; texelsHex[y][x][1] = hex[3];
+            texelsHex[y][x][2] = hex[4]; texelsHex[y][x][3] = hex[5];
+            texelsHex[y][x][4] = hex[6]; texelsHex[y][x][5] = hex[7];
 
-            texels[x][y] = hexToDec(texelsHex[x][y]);
+            texels[y][x] = hexToDec(texelsHex[y][x]);
         }
     }
 }
@@ -609,11 +603,11 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
     for (i = x0; i < x1; i++){
         int posX = abs(i % width);
 
-        char rHex[2] = {texelsHex[posX][posY][0], texelsHex[posX][posY][1]};
-        char gHex[2] = {texelsHex[posX][posY][2], texelsHex[posX][posY][3]};
-        char bHex[2] = {texelsHex[posX][posY][4], texelsHex[posX][posY][5]};
+        char rHex[2] = {texelsHex[posY][posX][0], texelsHex[posY][posX][1]};
+        char gHex[2] = {texelsHex[posY][posX][2], texelsHex[posY][posX][3]};
+        char bHex[2] = {texelsHex[posY][posX][4], texelsHex[posY][posX][5]};
 
-        int tex = texels[posX][posY];
+        int tex = texels[posY][posX];
         int rValue = ((tex >> 16) & 0xFF);
         int gValue = ((tex >> 8 ) & 0xFF);
         int bValue = ((tex) & 0xFF);
@@ -622,8 +616,8 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
         double gColor = ((double)(gValue) / 255.0);
         double bColor = ((double)(bValue) / 255.0);
 
-
         glColor3f(rColor, gColor, bColor);
+        //glColor3f(0,1,1);
         plot(i,y);
     }
 }
@@ -750,13 +744,13 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
 //Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
 void readFiles(){
 
-    char *provinces[7] = {"mapa/Puntarenas.txt",
-                          "mapa/Alajuela.txt",
-                          "mapa/Limon.txt", 
-                          "mapa/SanJose.txt",
-                          "mapa/Heredia.txt",
-                          "mapa/Guanacaste.txt",
-                          "mapa/Cartago.txt" };
+    char *provinces[7] = {"map/Puntarenas.txt",
+                          "map/Alajuela.txt",
+                          "map/Limon.txt", 
+                          "map/SanJose.txt",
+                          "map/Heredia.txt",
+                          "map/Guanacaste.txt",
+                          "map/Cartago.txt" };
     
     char comma;
     int i, j, k, c, vertexAmount;
