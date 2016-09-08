@@ -12,21 +12,17 @@
 static int resX = 600;
 static int resY;
 
-static double Xmin;
-static double Xmax;
-static double Ymin;
-static double Ymax;
+static double Xmin, Xmax, Ymin, Ymax;
 
 static int provinceCounter = 0;
 static int totalVertexCount = 0;
 
-static int **texels;
-static char ***texelsHex;
+static int po = 0;
+static char texsc[7][128][128][3][3];
+static int texsi[7][128][128][3];
 
-static char ****texsc;
-static int ***texsi;
-
-static int width, height;
+static int width = 128;
+static int height = 128;
 static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
 static int ptp = 7;
 static int vertexAmounts[7];
@@ -556,54 +552,23 @@ int strToDec(char *pStr){
     return (int)strtol(pStr, (char **)NULL, 10);
 }
 
-void getTexels(){
-    int counter, x, y, i;
-    char ini[2];
-    char w[4];
-    char h[4];
+void getTexels(char* pFile, int p){
+    int counter, x, y, i, j;
     char dump[100];
 
-    FILE* file = fopen("textures/mona.ppm", "r");
+    FILE* file = fopen(pFile, "r");
     
     //Read width and height
-    fscanf(file, "%s", &ini[0]);
-    for (i = 0; i < 7; ++i) { fscanf(file, "%s", &dump[i]); }
-    fscanf(file, "%s", &w[0]); fscanf(file, "%s", &h[0]);
-    fscanf(file, "%s", &dump[0]);
- 
-    width = strToDec(w);
-    height = strToDec(h);
-
-    texsc = malloc(sizeof(char ***) * height);
-    texsi = malloc(sizeof(int **) * height);
-    for (i = 0; i < height; i++){
-        texsc[i] = malloc(sizeof(char **) * width);
-        texsi[i] = malloc(sizeof(int *) * width);
-        for(y = 0; y < width; y++){
-            texsc[i][y] = malloc(sizeof(char *) * 3);
-            texsi[i][y] = malloc(sizeof(int)  * 3);
-            for(x = 0; x < 3; x++){
-                texsc[i][y][x] = malloc(sizeof(char) * 3);
+    for (i = 0; i < 11; ++i) { fscanf(file, "%s", &dump[i]); }
+    
+    for(x = 0; x < 128; x++){
+        for (y = 0; y < 128; y++){
+            for(i = 0; i < 3; i++){
+                printf("Test\n");
+                fscanf(file, "%s", &texsc[p][x][y][i][0]);
+                printf("%s\n", texsc[p][x][y][i]);
+                texsi[p][128 - x -1][y][i] = strToDec(texsc[p][x][y][i]); 
             }
-        }
-    }
-
-    for (i = 0; i < height; ++i) {
-        for (y = 0; y < width; ++y){
-            fscanf(file, "%s", texsc[i][y][0]);
-            fscanf(file, "%s", texsc[i][y][1]);
-            fscanf(file, "%s", texsc[i][y][2]);        
-        }
-    }
-
-    for (i = 0; i < height; i++) {
-        for (y = 0; y < width; ++y){
-            texsi[i][y][0] = strToDec(texsc[height - i -1][y][0]);
-            texsi[i][y][1] = strToDec(texsc[height - i -1][y][1]);
-            texsi[i][y][2] = strToDec(texsc[height - i -1][y][2]);
-            //printf("%i ", texsi[i][y][0]);
-            //printf("%i ", texsi[i][y][1]);
-            //printf("%i\n", texsi[i][y][2]);
         }
     }
 }
@@ -614,9 +579,9 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
     for (i = x0; i < x1; i++){
         int posX = abs(i % width);
 
-        int rValue = texsi[posY][posX][0];
-        int gValue = texsi[posY][posX][1];
-        int bValue = texsi[posY][posX][2];
+        int rValue = texsi[po][posY][posX][0];
+        int gValue = texsi[po][posY][posX][1];
+        int bValue = texsi[po][posY][posX][2];
 
         double rColor = ((double)(rValue) / 255.0);
         double gColor = ((double)(gValue) / 255.0);
@@ -819,9 +784,9 @@ void allScanlines (struct Coord *pParam, int pColores) {
     int i;
 
     for(i = 0; i < ptp; i++){
-
-        glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
         
+        glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
+
         scanlineFill(vertexAmounts[i], pParam, plot, counter);
         counter += vertexAmounts[i];
     }
@@ -840,7 +805,13 @@ void renderScene(void){
 }
 
 int main(int argc, char *argv[]){
-    getTexels();
+    getTexels("textures/mona.ppm",0);
+    getTexels("textures/mona.ppm",1);
+    getTexels("textures/mona.ppm",2);
+    getTexels("textures/mona.ppm",3);
+    getTexels("textures/mona.ppm",4);
+    getTexels("textures/mona.ppm",5);
+    getTexels("textures/mona.ppm",6);
 
     buffer = (COLOR **)malloc(resX * sizeof(COLOR*));
     
