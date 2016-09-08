@@ -564,9 +564,7 @@ void getTexels(char* pFile, int p){
     for(x = 0; x < 128; x++){
         for (y = 0; y < 128; y++){
             for(i = 0; i < 3; i++){
-                printf("Test\n");
                 fscanf(file, "%s", &texsc[p][x][y][i][0]);
-                printf("%s\n", texsc[p][x][y][i]);
                 texsi[p][128 - x -1][y][i] = strToDec(texsc[p][x][y][i]); 
             }
         }
@@ -785,6 +783,8 @@ void allScanlines (struct Coord *pParam, int pColores) {
 
     for(i = 0; i < ptp; i++){
         
+        po = i;
+        
         glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
 
         scanlineFill(vertexAmounts[i], pParam, plot, counter);
@@ -805,13 +805,13 @@ void renderScene(void){
 }
 
 int main(int argc, char *argv[]){
-    getTexels("textures/mona.ppm",0);
-    getTexels("textures/mona.ppm",1);
-    getTexels("textures/mona.ppm",2);
-    getTexels("textures/mona.ppm",3);
-    getTexels("textures/mona.ppm",4);
-    getTexels("textures/mona.ppm",5);
-    getTexels("textures/mona.ppm",6);
+    getTexels("textures/1.ppm",0);
+    getTexels("textures/2.ppm",1);
+    getTexels("textures/3.ppm",2);
+    getTexels("textures/4.ppm",3);
+    getTexels("textures/5.ppm",4);
+    getTexels("textures/6.ppm",5);
+    getTexels("textures/7.ppm",6);
 
     buffer = (COLOR **)malloc(resX * sizeof(COLOR*));
     
