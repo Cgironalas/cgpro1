@@ -552,6 +552,7 @@ void calculateMinMax(int vertexAmount){
 }
 
 int hexToDec(char *pHex){
+    
     return (int)strtol(pHex, NULL, 16);
 }
 
@@ -603,7 +604,7 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
         int posX = i % width;
         int place = posX * posY;
 
-        char rHex[2] = {texelsHex[place][0], texelsHex[place][1]};
+        /*char rHex[2] = {texelsHex[place][0], texelsHex[place][1]};
         char gHex[2] = {texelsHex[place][2], texelsHex[place][3]};
         char bHex[2] = {texelsHex[place][4], texelsHex[place][5]};
 
@@ -619,23 +620,25 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
         double rColor = ((double)(rValue) / 255.0);
         double gColor = ((double)(gValue) / 255.0);
         double bColor = ((double)(bValue) / 255.0);
-        
-        glColor3f(rColor,gColor,bColor);
+        */
+        glColor3f(1,0,1);
+
         plot(i,y);
     }
 }
 
 void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter) {
 
-	int i,j,active,dy,dx,temp;
+	int i,j,c,active,dy,dx,temp,ymax,ymin;
 	int scanline = resY;
+	
+    int Yf[vertexAmount+1]; //Todas las y
+    int Xf[vertexAmount+1]; //Todas las x
+    int ac[vertexAmount+1]; //El array análogo que me dice cuáles están activos y cuáles no
 
-	int xi[vertexAmount+1];
-	int Yf[vertexAmount+1];
-    int Xf[vertexAmount+1];
-    double slope[vertexAmount+1];
+    double d[vertexAmount+1]; //El valor que va a incrementar
+    double slope[vertexAmount+1]; //Precálculo de los -1/m
     
-   
     //Mapeo a puntos del framebuffer. 
     for(i = 0; i < vertexAmount; i++){
         Yf[i] = (int) (resY * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
@@ -650,32 +653,55 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
 		bresenham (Xf[i],Yf[i],Xf[i+1],Yf[i+1],plot);
 	}
 
+    ymax = Yf[0];
+    ymin = Yf[0];
+
 	for(i=0; i<vertexAmount; i++) {
+        if (Yf[i] > ymax) { ymax = Yf[i]; }
+        if (Yf[i] < ymin) { ymin = Yf[i]; }
+
 		dy = Yf[i+1] - Yf[i];
 		dx = Xf[i+1] - Xf[i];
 
 		if(dy==0) slope[i] = 1.0;
 		if(dx==0) slope[i] = 0.0;
-
-		if( (dy!=0) && (dx!=0) ) {
-			slope[i]= (double)dx/dy; 
-		}
+		if( (dy!=0) && (dx!=0) ) { slope[i]= (double)-dx/dy; }
+        
+        //Escoger el x inicial
+        if(Yf[i+1] > Yf[i]) { d[i] = Xf[i+1]; }
+        else { d[i] = Xf[i]; }
+        
+        ac[i] = 0;
 	}
 
-	while (scanline > 0){ //0 ó el menor de las Y. 
+    scanline = ymax;
+	while (scanline > ymin){ 
 		active=0;
 		
-		//Cálculo de las intersecciones activas ymin < scanline < ymax
+		//Pone bordes activos e inactivos en array análogo
 		for(i=0;i<vertexAmount;i++){
-			if( (( Yf[i]<= scanline ) && (Yf[i+1] > scanline ))  ||
+    		if( (( Yf[i]<= scanline ) && (Yf[i+1] > scanline ))  ||
 				(( Yf[i] > scanline ) && (Yf[i+1]<= scanline )) )  {
-				
-				xi[active]=(int)(Xf[i]+slope[i]*(scanline-Yf[i])); //Intersección.
-				active++;
+                active ++;
+                ac[i] = 1;
 			}
-		}
+            else {
+                ac[i] = 0;
+            }
+	    }
+        
+        double xi[active];
+        
+        c = 0;
+        //Copio los valores de los delta.
+        for(i=0;i<vertexAmount;i++){
+            if (ac[i]==1){
+                xi[c] = d[i];
+                c++;
+            }
+        }
 
-		//Ordena las intersecciones por x ascendiente.
+		//Ordena ascendentemente los delta
 		for(j=0;j<active-1;j++){ 
 			for(i=0;i<active-1;i++){
 				if(xi[i]>xi[i+1]){
@@ -686,12 +712,20 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
 			}
 		}
 
-		//Dibuja las líneas rectas entre las intersecciones. 
+		//Dibuja la línea entre espacios.
 		for(i=0;i<active;i+=2){
-			drawHorLine(xi[i],xi[i+1]+1,scanline);
+            drawHorLine(((int)xi[i]),((int)xi[i+1])+1,scanline);     
 		}
-		scanline--;
-	}			
+
+        //Actualizo los valores de los delta para la siguiente vuelta.
+        for(i=0;i<vertexAmount;i++){
+            if (ac[i]==1){
+                d[i] += slope[i];
+            }
+        }
+
+        scanline--;
+	}
 }
 
 void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter){//antes paintPolygon
@@ -799,6 +833,7 @@ void renderScene(void){
     glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
+
     allScanlines(coords, 1);
     allBorders(coords, 1);
     glFlush();
