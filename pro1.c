@@ -20,8 +20,8 @@ static double Ymax;
 static int provinceCounter = 0;
 static int totalVertexCount = 0;
 
-static int *texels;
-static char **texelsHex;
+static int **texels;
+static char ***texelsHex;
 static int width, height;
 
 struct Coord {
@@ -557,7 +557,7 @@ int hexToDec(char *pHex){
 }
 
 void getTexels(){
-    int counter, i;
+    int counter, x, y;
     char w[8];
     char h[8];
     char hex[8];
@@ -572,66 +572,67 @@ void getTexels(){
     height = hexToDec(h);
     printf("Ancho %i, Alto %i\n", width, height);
 
-    int totalPixels = width*height;
-    //char texelHex[totalPixels][6];
-    texels = malloc(sizeof(int) * totalPixels);
-    texelsHex = malloc(sizeof(char * ) * totalPixels);
-
-    for(i = 0; i < totalPixels; i++){
-        texelsHex[i] = malloc(sizeof(char) * 6);
+    texels = malloc(sizeof(int * ) * width);
+    for(x = 0; x < width; x++){
+        texels[x] = malloc(sizeof(int) * height);
     }
 
-    for(i = 0; i < totalPixels; i++){
-        fscanf(file, "%s", &hex[0]);
-        fscanf(file, "%s", &hex[4]);
+    texelsHex = malloc(sizeof(char ** ) * width);
 
-        texelsHex[i][0] = hex[2];
-        texelsHex[i][1] = hex[3];
-        texelsHex[i][2] = hex[4];
-        texelsHex[i][3] = hex[5];
-        texelsHex[i][4] = hex[6];
-        texelsHex[i][5] = hex[7];
+    for(x = 0; x < width; x++){
+        texelsHex[x] = malloc(sizeof(char * ) * height);
+        for(y = 0; y < height; y++){
+            texelsHex[x][y] = malloc(sizeof(char) * 6);
+        }
+    }
 
-        texels[i] = hexToDec(texelsHex[i]);
-        //printf("%s\n", texelsHex[i]);
+    for(x = 0; x < width; x++){
+        for(y = 0; y < height; y++){
+            fscanf(file, "%s", &hex[0]);
+            fscanf(file, "%s", &hex[4]);
+
+            texelsHex[x][y][0] = hex[2];
+            texelsHex[x][y][1] = hex[3];
+            texelsHex[x][y][2] = hex[4];
+            texelsHex[x][y][3] = hex[5];
+            texelsHex[x][y][4] = hex[6];
+            texelsHex[x][y][5] = hex[7];
+
+            texels[x][y] = hexToDec(texelsHex[x][y]);
+        }
     }
 }
 
 void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bresenham.
     int i;
-    int posY = y % height;
+    int posY = abs(y % height);
     for (i = x0; i < x1; i++){
-        int posX = i % width;
-        int place = posX * posY;
+        int posX = abs(i % width);
 
-        /*char rHex[2] = {texelsHex[place][0], texelsHex[place][1]};
-        char gHex[2] = {texelsHex[place][2], texelsHex[place][3]};
-        char bHex[2] = {texelsHex[place][4], texelsHex[place][5]};
+        char rHex[2] = {texelsHex[posX][posY][0], texelsHex[posX][posY][1]};
+        char gHex[2] = {texelsHex[posX][posY][2], texelsHex[posX][posY][3]};
+        char bHex[2] = {texelsHex[posX][posY][4], texelsHex[posX][posY][5]};
 
-        int tex = texels[place];
+        int tex = texels[posX][posY];
         int rValue = ((tex >> 16) & 0xFF);
         int gValue = ((tex >> 8 ) & 0xFF);
         int bValue = ((tex) & 0xFF);
 
-        //int rValue = hexToDec(rHex);
-        //int gValue = hexToDec(gHex);
-        //int bValue = hexToDec(bHex);
-
         double rColor = ((double)(rValue) / 255.0);
         double gColor = ((double)(gValue) / 255.0);
         double bColor = ((double)(bValue) / 255.0);
-        */
-        glColor3f(1,0,1);
 
+
+        glColor3f(rColor, gColor, bColor);
         plot(i,y);
     }
 }
 
 void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter) {
 
-	int i,j,c,active,dy,dx,temp,ymax,ymin;
-	int scanline = resY;
-	
+    int i,j,c,active,dy,dx,temp,ymax,ymin;
+    int scanline = resY;
+    
     int Yf[vertexAmount+1]; //Todas las y
     int Xf[vertexAmount+1]; //Todas las x
     int ac[vertexAmount+1]; //El array análogo que me dice cuáles están activos y cuáles no
@@ -646,49 +647,49 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
     }
 
     Xf[vertexAmount] = Xf[0];
-	Yf[vertexAmount] = Yf[0];
+    Yf[vertexAmount] = Yf[0];
 
-	//Dibujar los bordes para que no haya imperfecciones. 
-	for(i=0;i<vertexAmount;i++){
-		bresenham (Xf[i],Yf[i],Xf[i+1],Yf[i+1],plot);
-	}
+    //Dibujar los bordes para que no haya imperfecciones. 
+    for(i=0;i<vertexAmount;i++){
+        bresenham (Xf[i],Yf[i],Xf[i+1],Yf[i+1],plot);
+    }
 
     ymax = Yf[0];
     ymin = Yf[0];
 
-	for(i=0; i<vertexAmount; i++) {
+    for(i=0; i<vertexAmount; i++) {
         if (Yf[i] > ymax) { ymax = Yf[i]; }
         if (Yf[i] < ymin) { ymin = Yf[i]; }
 
-		dy = Yf[i+1] - Yf[i];
-		dx = Xf[i+1] - Xf[i];
+        dy = Yf[i+1] - Yf[i];
+        dx = Xf[i+1] - Xf[i];
 
-		if(dy==0) slope[i] = 1.0;
-		if(dx==0) slope[i] = 0.0;
-		if( (dy!=0) && (dx!=0) ) { slope[i]= (double)-dx/dy; }
+        if(dy==0) slope[i] = 1.0;
+        if(dx==0) slope[i] = 0.0;
+        if( (dy!=0) && (dx!=0) ) { slope[i]= (double)-dx/dy; }
         
         //Escoger el x inicial
         if(Yf[i+1] > Yf[i]) { d[i] = Xf[i+1]; }
         else { d[i] = Xf[i]; }
         
         ac[i] = 0;
-	}
+    }
 
     scanline = ymax;
-	while (scanline > ymin){ 
-		active=0;
-		
-		//Pone bordes activos e inactivos en array análogo
-		for(i=0;i<vertexAmount;i++){
-    		if( (( Yf[i]<= scanline ) && (Yf[i+1] > scanline ))  ||
-				(( Yf[i] > scanline ) && (Yf[i+1]<= scanline )) )  {
+    while (scanline > ymin){ 
+        active=0;
+        
+        //Pone bordes activos e inactivos en array análogo
+        for(i=0;i<vertexAmount;i++){
+            if( (( Yf[i]<= scanline ) && (Yf[i+1] > scanline ))  ||
+                (( Yf[i] > scanline ) && (Yf[i+1]<= scanline )) )  {
                 active ++;
                 ac[i] = 1;
-			}
+            }
             else {
                 ac[i] = 0;
             }
-	    }
+        }
         
         double xi[active];
         
@@ -701,21 +702,21 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
             }
         }
 
-		//Ordena ascendentemente los delta
-		for(j=0;j<active-1;j++){ 
-			for(i=0;i<active-1;i++){
-				if(xi[i]>xi[i+1]){
-					temp=xi[i];
-					xi[i]=xi[i+1];
-					xi[i+1]=temp;
-				}
-			}
-		}
+        //Ordena ascendentemente los delta
+        for(j=0;j<active-1;j++){ 
+            for(i=0;i<active-1;i++){
+                if(xi[i]>xi[i+1]){
+                    temp=xi[i];
+                    xi[i]=xi[i+1];
+                    xi[i+1]=temp;
+                }
+            }
+        }
 
-		//Dibuja la línea entre espacios.
-		for(i=0;i<active;i+=2){
+        //Dibuja la línea entre espacios.
+        for(i=0;i<active;i+=2){
             drawHorLine(((int)xi[i]),((int)xi[i+1])+1,scanline);     
-		}
+        }
 
         //Actualizo los valores de los delta para la siguiente vuelta.
         for(i=0;i<vertexAmount;i++){
@@ -725,7 +726,7 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
         }
 
         scanline--;
-	}
+    }
 }
 
 void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int counter){//antes paintPolygon
