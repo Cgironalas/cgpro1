@@ -22,7 +22,14 @@ static int totalVertexCount = 0;
 
 static int **texels;
 static char ***texelsHex;
+
+static char ****texsc;
+static int ***texsi;
+
 static int width, height;
+static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
+static int ptp = 7;
+static int vertexAmounts[7];
 
 struct Coord {
     double longitud;
@@ -30,9 +37,6 @@ struct Coord {
     double w;
 };
 
-static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
-static int ptp = 7;
-static int vertexAmounts[7];
 static struct Coord *coords;
 static struct Border *borders;
 
@@ -45,6 +49,7 @@ typedef struct {
 COLOR **buffer;
 
 void calculateResY(){
+    
     resY = (int) (resX * (Ymax - Ymin)) / (Xmax - Xmin);
 }
 
@@ -85,12 +90,12 @@ void mouse(int button, int state, int x, int y){
     }
 }
 
-/*
-    mode{0==NORMAL, 1 slow y 2 fast}
-    direction {0 = up, 1 = down, 2= right, 3 = left}
-    0.0 percentage < 1.0 para evitar división
-*/
 void panEntireScene(unsigned int direction, double percentage){
+    /*
+        mode{0==NORMAL, 1 slow y 2 fast}
+        direction {0 = up, 1 = down, 2= right, 3 = left}
+        0.0 percentage < 1.0 para evitar división
+    */    
     if (direction== 2 || direction==3){ //Es paneo horizontal
         double xDelta=Xmax-Xmin;
         if (direction==2){ //Es para la derecha
@@ -117,18 +122,16 @@ void panEntireScene(unsigned int direction, double percentage){
     //renderScene();
 }
 
-/*
-    directionPan {0 = up, 1 = down, 2= right, 3 = left}
-    specialMode = tecla de modo.
-*/
-void panning(unsigned int directionPan , int specialMode){
+void panning(unsigned int directionPan , int specialMode){ 
+    /*
+        directionPan {0 = up, 1 = down, 2= right, 3 = left}
+        specialMode = tecla de modo.
+    */    
 
-    //printf("%i \n", specialMode);
-            
     if (specialMode == GLUT_ACTIVE_SHIFT){
-        panEntireScene(directionPan, 0.3);
+
         printf("Fast panning \n");
-        
+        panEntireScene(directionPan, 0.3);
     }else if (specialMode == GLUT_ACTIVE_CTRL){
 
         printf("Slow panning \n");
@@ -158,12 +161,12 @@ void zoomScene(double percentage){
     //renderScene();
 }
 
-/*
-    typeZoom{0 = Zoom Out, 1 = Zoom In }
-    specialMode = tecla de modo.
-*/
 void zooming(unsigned int typeZoom, int specialMode){
-    
+    /*
+        typeZoom{0 = Zoom Out, 1 = Zoom In }
+        specialMode = tecla de modo.
+    */
+
     double z;
 
     if (specialMode == GLUT_ACTIVE_SHIFT){
@@ -196,12 +199,12 @@ void zooming(unsigned int typeZoom, int specialMode){
     }
 }
 
-/*
-    mode{0==NORMAL, 1 slow y 2 fast}
-    direction {0 = Zoom Out, 1 = Zoom In }
-*/
 void processKeyPressed(unsigned char key, int x, int y){
 
+    /*
+        mode{0==NORMAL, 1 slow y 2 fast}
+        direction {0 = Zoom Out, 1 = Zoom In }
+    */
     int modoTecla = glutGetModifiers();
 
     switch (key){
@@ -255,8 +258,8 @@ void specialKeys(int key, int x, int y){
     }
 }
 
-//Trazo de la línea entre dos puntos.
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
+    //Trazo de la línea entre dos puntos.
     int d2x,d2y,dx,dy,d,
         Delta_N,Delta_NE,Delta_E,Delta_SE,
         Delta_S,Delta_SW,Delta_W,Delta_NW,
@@ -427,9 +430,8 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
-//Algoritmo de clipeo con los vértices de la línea pasados POR VALOR.
 void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, double edgeTop, double *x0, double *y0, double *x1, double *y1){
-
+    //Algoritmo de clipeo con los vértices de la línea pasados POR VALOR.
     unsigned int p0Pos[4] = {0, 0 , 0, 0};
     unsigned int p1Pos[4] = {0, 0 , 0, 0};
     
@@ -549,50 +551,59 @@ void calculateMinMax(int vertexAmount){
     calculateResY();
 }
 
-int hexToDec(char *pHex){    
-    return (int)strtol(pHex, NULL, 16);
+int strToDec(char *pStr){    
+ 
+    return (int)strtol(pStr, (char **)NULL, 10);
 }
 
 void getTexels(){
-    int counter, x, y;
-    char w[8];
-    char h[8];
-    char hex[8];
-    FILE* file = fopen("mona.AVS", "r");
+    int counter, x, y, i;
+    char ini[2];
+    char w[4];
+    char h[4];
+    char dump[100];
+
+    FILE* file = fopen("textures/mona.ppm", "r");
     
     //Read width and height
-    fscanf(file, "%s", &w[0]);
-    fscanf(file, "%s", &w[4]);
-    fscanf(file, "%s", &h[0]);
-    fscanf(file, "%s", &h[4]);
+    fscanf(file, "%s", &ini[0]);
+    for (i = 0; i < 7; ++i) { fscanf(file, "%s", &dump[i]); }
+    fscanf(file, "%s", &w[0]); fscanf(file, "%s", &h[0]);
+    fscanf(file, "%s", &dump[0]);
  
-    width = hexToDec(w);
-    height = hexToDec(h);
-    //printf("Ancho %i, Alto %i\n", width, height);
+    width = strToDec(w);
+    height = strToDec(h);
 
-    texels = malloc(sizeof(int * ) * height);
-    for(y = 0; y < height; y++){
-        texels[y] = malloc(sizeof(int) * width);
-    }
-
-    texelsHex = malloc(sizeof(char ** ) * height);
-    for(y = 0; y < height; y++){
-        texelsHex[y] = malloc(sizeof(char * ) * width);
-        for(x = 0; x < width; x++){
-            texelsHex[y][x] = malloc(sizeof(char) * 6);
+    texsc = malloc(sizeof(char ***) * height);
+    texsi = malloc(sizeof(int **) * height);
+    for (i = 0; i < height; i++){
+        texsc[i] = malloc(sizeof(char **) * width);
+        texsi[i] = malloc(sizeof(int *) * width);
+        for(y = 0; y < width; y++){
+            texsc[i][y] = malloc(sizeof(char *) * 3);
+            texsi[i][y] = malloc(sizeof(int)  * 3);
+            for(x = 0; x < 3; x++){
+                texsc[i][y][x] = malloc(sizeof(char) * 3);
+            }
         }
     }
 
-    for(y = height-1; y >= 0; y--){
-        for(x = 0; x < width; x++){
-            fscanf(file, "%s", &hex[0]);
-            fscanf(file, "%s", &hex[4]);
+    for (i = 0; i < height; ++i) {
+        for (y = 0; y < width; ++y){
+            fscanf(file, "%s", texsc[i][y][0]);
+            fscanf(file, "%s", texsc[i][y][1]);
+            fscanf(file, "%s", texsc[i][y][2]);        
+        }
+    }
 
-            texelsHex[y][x][0] = hex[2]; texelsHex[y][x][1] = hex[3];
-            texelsHex[y][x][2] = hex[4]; texelsHex[y][x][3] = hex[5];
-            texelsHex[y][x][4] = hex[6]; texelsHex[y][x][5] = hex[7];
-
-            texels[y][x] = hexToDec(texelsHex[y][x]);
+    for (i = 0; i < height; i++) {
+        for (y = 0; y < width; ++y){
+            texsi[i][y][0] = strToDec(texsc[height - i -1][y][0]);
+            texsi[i][y][1] = strToDec(texsc[height - i -1][y][1]);
+            texsi[i][y][2] = strToDec(texsc[height - i -1][y][2]);
+            //printf("%i ", texsi[i][y][0]);
+            //printf("%i ", texsi[i][y][1]);
+            //printf("%i\n", texsi[i][y][2]);
         }
     }
 }
@@ -603,21 +614,15 @@ void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bre
     for (i = x0; i < x1; i++){
         int posX = abs(i % width);
 
-        char rHex[2] = {texelsHex[posY][posX][0], texelsHex[posY][posX][1]};
-        char gHex[2] = {texelsHex[posY][posX][2], texelsHex[posY][posX][3]};
-        char bHex[2] = {texelsHex[posY][posX][4], texelsHex[posY][posX][5]};
-
-        int tex = texels[posY][posX];
-        int rValue = ((tex >> 16) & 0xFF);
-        int gValue = ((tex >> 8 ) & 0xFF);
-        int bValue = ((tex) & 0xFF);
+        int rValue = texsi[posY][posX][0];
+        int gValue = texsi[posY][posX][1];
+        int bValue = texsi[posY][posX][2];
 
         double rColor = ((double)(rValue) / 255.0);
         double gColor = ((double)(gValue) / 255.0);
         double bColor = ((double)(bValue) / 255.0);
 
         glColor3f(rColor, gColor, bColor);
-        //glColor3f(0,1,1);
         plot(i,y);
     }
 }
@@ -741,9 +746,8 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
     }
 }
 
-//Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
 void readFiles(){
-
+    //Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
     char *provinces[7] = {"map/Puntarenas.txt",
                           "map/Alajuela.txt",
                           "map/Limon.txt", 
