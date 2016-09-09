@@ -20,12 +20,17 @@ static int totalVertexCount = 0;
 static int po = 0;
 static char texsc[7][128][128][3][3];
 static int texsi[7][128][128][3];
+static time_t t;
+static char *pro[7] = {"Puntarenas", "Alajuela", "Limón", "San José", "Heredia", "Guanacaste", "Cartago" };
 
 static int width = 128;
 static int height = 128;
 static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
 static int ptp = 7;
 static int vertexAmounts[7];
+static int errTs[7] = {0};
+static int rave = 0;
+static int textureFill = 0;
 
 struct Coord {
     double longitud;
@@ -212,6 +217,20 @@ void processKeyPressed(unsigned char key, int x, int y){
         case 100:  //Se presiona d Zoom Out
             zooming(1,modoTecla);
             break;
+
+        case 114:  //Se presiona d Zoom Out
+            rave=1;
+            break;
+
+        case 110:  //Se presiona d Zoom Out
+            rave=0;
+            textureFill=0;
+            break;
+            
+        case 116:
+            textureFill=1;
+            break;
+
     }        
 }
 
@@ -246,10 +265,6 @@ void specialKeys(int key, int x, int y){
             break;
         case GLUT_KEY_F11: //Se presiona a Zoom In
             zooming(1,specialMode);
-            break;
-
-        case GLUT_KEY_F12:  //Se presiona d Zoom Out
-            zooming(0,specialMode);
             break;
     }
 }
@@ -547,25 +562,44 @@ void calculateMinMax(int vertexAmount){
     calculateResY();
 }
 
-int strToDec(char *pStr){    
- 
-    return (int)strtol(pStr, (char **)NULL, 10);
-}
-
 void getTexels(char* pFile, int p){
     int counter, x, y, i, j;
     char dump[100];
-
-    FILE* file = fopen(pFile, "r");
+    srand((unsigned) time(&t));
+    FILE* file;
+    if (file = fopen(pFile, "r")) {
+        
+        //Read width and height
+        for (i = 0; i < 11; ++i) { 
+            fscanf(file, "%s", &dump[0]);
+            if (strcmp(dump,"128")==1 && (i==8||i==9)) {
+                errTs[p]=1;
+                printf("La textura de %s no cumple con las características de ancho y largo.\n", pro[p]);
+            }
+        }
     
-    //Read width and height
-    for (i = 0; i < 11; ++i) { fscanf(file, "%s", &dump[i]); }
-    
-    for(x = 0; x < 128; x++){
-        for (y = 0; y < 128; y++){
-            for(i = 0; i < 3; i++){
-                fscanf(file, "%s", &texsc[p][x][y][i][0]);
-                texsi[p][128 - x -1][y][i] = strToDec(texsc[p][x][y][i]); 
+        for(x = 0; x < 128; x++){
+            for (y = 0; y < 128; y++){
+                for(i = 0; i < 3; i++){
+                    fscanf(file, "%s", &texsc[p][x][y][i][0]);
+                    if (errTs[p]==0){
+                        texsi[p][128 - x -1][y][i] = (int)strtol(texsc[p][x][y][i],(char **)NULL, 10);
+                    }
+                    else {
+                        texsi[p][128 - x -1][y][i] = rand() % 255;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        errTs[p] = 1;
+        printf("La textura de %s no pudo abrirse. Se sustituirá por estática\n", pro[p]);
+        for(x = 0; x < 128; x++){
+            for (y = 0; y < 128; y++){
+                for(i = 0; i < 3; i++){
+                    texsi[p][128 - x -1][y][i] = rand() % 255;
+                }
             }
         }
     }
@@ -574,18 +608,23 @@ void getTexels(char* pFile, int p){
 void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bresenham.
     int i;
     int posY = abs(y % height);
+
+
     for (i = x0; i < x1; i++){
-        int posX = abs(i % width);
+        if (textureFill){
+            int posX = abs(i % width);
 
-        int rValue = texsi[po][posY][posX][0];
-        int gValue = texsi[po][posY][posX][1];
-        int bValue = texsi[po][posY][posX][2];
+            int rValue = texsi[po][posY][posX][0];
+            int gValue = texsi[po][posY][posX][1];
+            int bValue = texsi[po][posY][posX][2];
 
-        double rColor = ((double)(rValue) / 255.0);
-        double gColor = ((double)(gValue) / 255.0);
-        double bColor = ((double)(bValue) / 255.0);
+            double rColor = ((double)(rValue) / 255.0);
+            double gColor = ((double)(gValue) / 255.0);
+            double bColor = ((double)(bValue) / 255.0);
 
-        glColor3f(rColor, gColor, bColor);
+            glColor3f(rColor, gColor, bColor);
+        }
+        
         plot(i,y);
     }
 }
@@ -709,7 +748,7 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
     }
 }
 
-void readFiles(){
+int readFiles(){
     //Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
     char *provinces[7] = {"map/Puntarenas.txt",
                           "map/Alajuela.txt",
@@ -726,20 +765,27 @@ void readFiles(){
     double lon, lat;
 
     for(i = 0; i < ptp; i++){
-        FILE* file = fopen(provinces[i], "r");
-        vertexAmount = 0;
-        while ((c = getc(file)) != EOF){
-            if(c == '\n'){
-                vertexAmount++;
-                totalVertexCount++;
+        FILE* file;
+        if (file = fopen(provinces[i], "r")) {
+        
+
+            vertexAmount = 0;
+            while ((c = getc(file)) != EOF){
+                if(c == '\n'){
+                    vertexAmount++;
+                    totalVertexCount++;
+                }
             }
+        
+            vertexAmount++;
+            totalVertexCount++;
+            fclose(file);
+            vertexAmounts[i] = vertexAmount;
         }
-        vertexAmount++;
-        totalVertexCount++;
-        fclose(file);
-        vertexAmounts[i] = vertexAmount;
+        else {
+            return 0;
+        }
     }
-    
     //coords = (struct Coord*)calloc(totalVertexCount, sizeof(struct Coord));
     coords = malloc(sizeof(struct Coord)*totalVertexCount);
 
@@ -763,14 +809,15 @@ void readFiles(){
     }
     
     calculateMinMax(totalVertexCount);
+    return 1;
 }
 
-void allBorders (struct Coord *pParam, int pColores) {//antes drawBorders
+void allBorders (struct Coord *pParam) {//antes drawBorders
     int counter = 0;
     int i;
     for(i = 0; i < ptp; i++){
 
-        glColor3f ( 1, pColores , 1 ); 
+        glColor3f ( 1, 0, 0 ); 
         
         delineate(vertexAmounts[i], pParam, plot, counter); 
         counter += vertexAmounts[i]; 
@@ -782,10 +829,8 @@ void allScanlines (struct Coord *pParam, int pColores) {
     int i;
 
     for(i = 0; i < ptp; i++){
-        
         po = i;
-        
-        glColor3f ( ((double)i*50)/255 , pColores , ((double)i+50)/255 ); 
+        glColor3f ( ((double)i*50)/255 , 0, ((double)i+50)/255 ); 
 
         scanlineFill(vertexAmounts[i], pParam, plot, counter);
         counter += vertexAmounts[i];
@@ -794,46 +839,56 @@ void allScanlines (struct Coord *pParam, int pColores) {
 
 void renderScene(void){
 
-    glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
+    if (rave){ glClearColor((float)(rand() % 255)/255 , (float)(rand() % 255)/255 , (float)(rand() % 255)/255   ,1.0f); }
+    else { glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f); }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
 
     allScanlines(coords, 1);
-    allBorders(coords, 1);
+    allBorders(coords);
     glFlush();
     glutSwapBuffers();
 }
 
 int main(int argc, char *argv[]){
-    getTexels("textures/1.ppm",0);
-    getTexels("textures/2.ppm",1);
-    getTexels("textures/3.ppm",2);
-    getTexels("textures/4.ppm",3);
-    getTexels("textures/5.ppm",4);
-    getTexels("textures/6.ppm",5);
-    getTexels("textures/7.ppm",6);
 
+    srand((unsigned) time(&t));
+    char *ts[7] = { "textures/1.ppm", "textures/2.ppm", "textures/3.ppm", "textures/4.ppm",
+                    "textures/5.ppm", "textures/6.ppm", "textures/7.ppm" };
+    
+    for (int i = 0; i < ptp; ++i){
+        getTexels(ts[i],i);   
+    }
+    
     buffer = (COLOR **)malloc(resX * sizeof(COLOR*));
     
-    readFiles();
+    if (readFiles() == 1){
+        glutInit(&argc, argv);
+        glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+        glutInitWindowSize(resX,resY);
+        glutCreateWindow("CG Proyecto 1");
+        
+        if (rave){ glClearColor((float)(rand() % 255)/255 , (float)(rand() % 255)/255 , (float)(rand() % 255)/255   ,1.0f); }
+        else { glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f);  }
+        glClear(GL_COLOR_BUFFER_BIT);
+        gluOrtho2D(-0.5, resX +0.5, -0.5, resY + 0.5);
 
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-    glutInitWindowSize(resX,resY);
-    glutCreateWindow("CG Proyecto 1");
-    glClear(GL_COLOR_BUFFER_BIT);
-    gluOrtho2D(-0.5, resX +0.5, -0.5, resY + 0.5);
+        allScanlines(coords, 1);
+        allBorders(coords);
 
-    allScanlines(coords, 1);
-    allBorders(coords, 1);
+        glFlush();
 
-    glFlush();
+        glutMouseFunc(mouse);
+        glutKeyboardFunc(processKeyPressed);
+        glutDisplayFunc(renderScene);
+        glutIdleFunc(renderScene); //Llama a renderScene cuando el glut no tiene comandos en buffer;
+        glutSpecialFunc(specialKeys);
 
-    glutMouseFunc(mouse);
-    glutKeyboardFunc(processKeyPressed);
-    glutDisplayFunc(renderScene);
-    glutIdleFunc(renderScene); //Llama a renderScene cuando el glut no tiene comandos en buffer;
-    glutSpecialFunc(specialKeys);
+        glutMainLoop();
+    }
+    else {
+        printf("El alguno de los archivos de puntos no pudo abrirse.");
+    }
 
-    glutMainLoop();
+   
 }
