@@ -9,7 +9,7 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 
-static int resX = 600;
+static int resX = 1000;
 static int resY;
 
 static double Xmin, Xmax, Ymin, Ymax;
@@ -99,7 +99,7 @@ void panEntireScene(unsigned int direction, double percentage){
     */    
     if (direction== 2 || direction==3){ //Es paneo horizontal
         double xDelta=Xmax-Xmin;
-        if (direction==2){ //Es para la derecha
+        if (direction==3){ //Es para la derecha
             Xmax-= xDelta * percentage;
             Xmin-= xDelta * percentage;
         }else{ //Es para la izquierda
@@ -110,7 +110,7 @@ void panEntireScene(unsigned int direction, double percentage){
     }else{//Es paneo vertical
         
         double yDelta = Ymax-Ymin;
-        if (direction==0){ //Es para arriba
+        if (direction==1){ //Es para arriba
 
             Ymax-= yDelta * percentage;
             Ymin-= yDelta * percentage;
@@ -265,6 +265,9 @@ void specialKeys(int key, int x, int y){
             break;
         case GLUT_KEY_F11: //Se presiona a Zoom In
             zooming(1,specialMode);
+            break;
+        case GLUT_KEY_F12: //Se presiona a Zoom out
+            zooming(0,specialMode);
             break;
     }
 }
