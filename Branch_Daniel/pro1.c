@@ -9,13 +9,28 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 
+
+
 static int res = 600;
 static double Xmin;
 static double Xmax;
 static double Ymin;
 static double Ymax;
+
+static double XminTemp;
+static double XmaxTemp;
+static double YminTemp;
+static double YmaxTemp;
+
+static double xCenter;
+static double yCenter; 
+
+
+
 static int provinceCounter = 0;
 static int totalVertexCount = 0;
+
+static unsigned int inputEnable = 1;
 
 struct Coord {
     double longitud;
@@ -25,9 +40,16 @@ struct Coord {
 
 static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
 static int ptp = 7;
-static int vertexAmounts[7];
+static int vertexAmounts[7]; //Punto en el que pasa de una provincia a otra.
 static struct Coord *coords;
-static struct Border *borders;
+static struct Coord *coordsTemp;
+
+static int zoomInLimit = -6;
+static int zoomOutLimit = 12;
+static double zoomActual = 0; //
+
+static double panningMovement; //Acumuladores
+static double actualRotationDegree; //Acumulador de rotación 
 
 typedef struct {
   double r;
@@ -57,6 +79,17 @@ void plot (int x, int y){
 
 
 
+
+
+void disableKeyboardAndMouse(){
+    inputEnable = 0;
+}
+
+void enableKeyboardAndMouse(){
+    inputEnable = 1;
+}
+
+
 void mouse(int button, int state, int x, int y){
 
     if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
@@ -77,15 +110,61 @@ void mouse(int button, int state, int x, int y){
 }
 
 
+
+void resize(int width, int height) {
+    // we ignore the params and do:
+    glutReshapeWindow(res, res);
+}
+
+void copyClippingArray(){
+
+    for (int i=0; i<totalVertexCount;i++){
+
+        coordsTemp[i].longitud = coords[i].longitud;
+        coordsTemp[i].latitud = coords[i].latitud;
+        coordsTemp[i].w = coords[i].w;
+    }
+}
+
+void resetValues(){
+    
+    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+
+        coordsTemp[i].longitud  = coords[i].longitud; 
+        coordsTemp[i].latitud  = coords[i].latitud; 
+        coordsTemp[i].w  = coords[i].w; 
+    }
+
+    XminTemp = Xmin;
+    XmaxTemp = Xmax;
+    YminTemp = Ymin;
+    YmaxTemp = Ymax;
+
+    actualRotationDegree=0.0;
+    zoomActual=0;
+}
+
+void calculateCenterPoint(){
+    xCenter = (XmaxTemp-XminTemp)/2;
+    yCenter = (YmaxTemp-YminTemp)/2;
+
+    xCenter+=XminTemp;
+    yCenter+=YminTemp;
+}
+
+
 /*
-    mode{0==NORMAL, 1 slow y 2 fast}
-    direction {0 = up, 1 = down, 2= right, 3 = left}
-    0.0 percentage < 1.0 para evitar división
+     direction {0 = up, 
+     1 = down, 
+     2= right, 
+     3 = left}
 */
-void panEntireScene(unsigned int direction, double percentage){
+     /*
+void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, double newYmax, unsigned int direction){
     if (direction== 2 || direction==3){ //Es paneo horizontal
         double xDelta=Xmax-Xmin;
         if (direction==2){ //Es para la derecha
+
             Xmax-= xDelta * percentage;
             Xmin-= xDelta * percentage;
         }else{ //Es para la izquierda
@@ -106,16 +185,49 @@ void panEntireScene(unsigned int direction, double percentage){
             Ymin+= yDelta * percentage;
         }
     }      
-    //renderScene();
+}
+*/
+
+void panEntireScene(unsigned int direction, double percentage){
+    /*mode{0==NORMAL, 1 slow y 2 fast}
+    direction {0 = up, 1 = down, 2= right, 3 = left}
+    0.0 percentage < 1.0 para evitar división
+    */
+    if (direction== 2 || direction==3){ //Es paneo horizontal
+        double xDelta=XmaxTemp-XminTemp;
+
+        if (direction==2){ //Es para la derecha
+            XmaxTemp-= xDelta * percentage;
+            XminTemp-= xDelta * percentage;
+        }else{ //Es para la izquierda
+
+            XmaxTemp+= xDelta * percentage;
+            XminTemp+= xDelta * percentage;
+        }
+    }else{//Es paneo vertical
+        
+        double yDelta = Ymax-Ymin;
+        if (direction==0){ //Es para arriba
+
+            YmaxTemp-= yDelta * percentage;
+            YminTemp-= yDelta * percentage;
+        }else{ //Es para abajo
+
+            YmaxTemp+= yDelta * percentage;
+            YminTemp+= yDelta * percentage;
+        }
+    }
+
+    printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", Xmin, Ymin, Xmax, Ymax);
+    enableKeyboardAndMouse();
 }
 
 
-/*
-    directionPan {0 = up, 1 = down, 2= right, 3 = left}
-    specialMode = tecla de modo.
-*/
-void panning(unsigned int directionPan , int specialMode){
 
+void panning(unsigned int directionPan , int specialMode){
+    /*directionPan {0 = up, 1 = down, 2= right, 3 = left}
+    specialMode = tecla de modo.
+    */
     if (specialMode == GLUT_ACTIVE_SHIFT){
         {}
         panEntireScene(directionPan, 0.3);
@@ -133,64 +245,204 @@ void panning(unsigned int directionPan , int specialMode){
 
 
 
-void zoomScene(double percentage){
+void zoomScene(double zoomScale){
 
     //Cálculo del punto central de la ventana actual
-    double xCenter = (Xmax-Xmin)/2;
-    double yCenter = (Ymax-Ymin)/2;
+    calculateCenterPoint();
 
-    xCenter+=Xmin;
-    yCenter+=Ymin;
-
-    Xmin= ((Xmin-xCenter)*percentage)+xCenter;
-    Ymin=((Ymin-yCenter)*percentage)+yCenter;
-    Xmax=((Xmax-xCenter)*percentage)+xCenter;
-    Ymax=((Ymax-yCenter)*percentage)+yCenter;
+    XminTemp = ((Xmin-xCenter)*zoomScale)+xCenter;
+    YminTemp =((Ymin-yCenter)*zoomScale)+yCenter;
+    XmaxTemp =((Xmax-xCenter)*zoomScale)+xCenter;
+    YmaxTemp =((Ymax-yCenter)*zoomScale)+yCenter;
 
     printf("Centro: (%f, %f) \n", xCenter,yCenter);
-    printf("Zoom con escala %f \n", percentage);
+    printf("Zoom con escala %f \n", zoomScale);
+    printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", Xmin, Ymin, Xmax, Ymax);
     
-    //renderScene();
+
 }
 
-/*
-    typeZoom{0 = Zoom Out, 1 = Zoom In }
-    specialMode = tecla de modo.
-*/
-void zooming(unsigned int typeZoom, int specialMode){
-    
+
+
+
+
+
+int validateZoom(double zoomScale){
+    //Regresa 0 si la operacion si se puede realizar.
+    //1 si no se puede realizar.
+    //Recibe la cantidad de escalas que se pretende realizar.
+    //Esta escala es negativa si se quiere hacer zoom in y
+    //positiva si se quiere hacer zoom out.
+    //REALIZA EL CAMBIO DEL CONTADOR AUTOMÁTICAMENTE.
+    if(zoomInLimit<=(zoomActual+zoomScale)<=zoomOutLimit){
+        zoomActual=zoomActual+zoomScale; //Altera contador
+        printf("zoomActual: %lf \n", zoomActual);
+        return 0; //SI se puede realiza
+    }else{
+        return 1;
+    }
+}
+
+
+void zooming(int typeZoom, int specialMode){
+    //Zoom out = typeZoom 0
+    //Zoom in = typeZoom 1
     double z;
 
     if (specialMode == GLUT_ACTIVE_SHIFT){
-        z  = 3;
-        if (typeZoom==0){        
-            zoomScene(1/z); //Zoom out
-        }else {
-            zoomScene(z);   //Zoom in 
-        }
-        
+
         printf("Fast zooming \n");
-        
+        z  = 3;
+        if (typeZoom==0){  //Zoom out
+            printf("Zoom out \n");
+            if(validateZoom(z)==1){ //Fuera de limites
+            return;
+            }
+            z=1/z;
+            zoomScene(z);
+        }else { //Zoom In
+            printf("Zoom in \n");
+            if(validateZoom(-z)==1){ //Fuera de limites
+                return;
+            }
+            zoomScene(z);    
+        }
     }else if (specialMode == GLUT_ACTIVE_CTRL){
 
         z=1.5;
         printf("Slow zooming \n");
-        if (typeZoom==0){ //Zoom out
-            zoomScene(1/z);
-        }else { //Zoom in 
+        if (typeZoom==0){  //Zoom out
+            printf("Zoom out \n");
+            if(validateZoom(z)==1){ //Fuera de limites
+            return;
+            }
+            z=1/z;
+            zoomScene(z);
+        }else { //Zoom In
+            printf("Zoom in \n");
+            if(validateZoom(-z)==1){ //Fuera de limites
+                return;
+            }
             zoomScene(z);    
         }
     }else{ //Modo normal
 
         z=2;
         if (typeZoom==0){  //Zoom out
-            zoomScene(1/z);
-        }else {
+            printf("Zoom out \n");
+            if(validateZoom(z)==1){ //Fuera de limites
+            return;
+            }
+            z=1/z;
+            zoomScene(z);
+        }else { //Zoom In
+            printf("Zoom in \n");
+            if(validateZoom(-z)==1){ //Fuera de limites
+                return;
+            }
             zoomScene(z);    
         }
     }
-
 }
+
+
+//NO USADA POR EL MOMENTO.
+void validateRotationAngle(){
+
+    if(actualRotationDegree>360.0){
+        actualRotationDegree=actualRotationDegree-360.0;
+    }
+    if(actualRotationDegree<0.0){
+        actualRotationDegree=360.0-actualRotationDegree;
+    }
+}
+
+
+void rotateUniverse(double degrees){
+
+    //Se le suma al acumulador
+    actualRotationDegree = actualRotationDegree + degrees;
+    //validateRotationAngle();
+    calculateCenterPoint();
+
+
+    //Se vuelve a radianes al meterlo a las funciones
+    double sinAngle=sin(actualRotationDegree/180.0);
+    double cosAngle=cos(actualRotationDegree/180.0);
+
+    printf("Grados acumulados: %lf \n", degrees);
+    printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
+    printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
+    printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
+    printf("Valor de rotación actual %lf \n", actualRotationDegree);
+    double matrixRotationFila0[3]={cosAngle, 
+        -sinAngle,
+        xCenter-xCenter*cosAngle+yCenter*sinAngle};
+    double matrixRotationFila1[3]={sinAngle, 
+        cosAngle, 
+        yCenter-xCenter*sinAngle-yCenter*cosAngle};
+    double matrixRotationFila2[3]={0.0,0.0,1.0};
+
+
+    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+
+        double x=coords[i].longitud;
+        double y=coords[i].latitud;
+        double w=coords[i].w;
+
+        //printf("Punto a rotar (%lf, %lf) \n", coords[i].longitud,coords[i].latitud);
+
+        coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
+        coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
+        coordsTemp[i].w=matrixRotationFila2[0]*x+matrixRotationFila2[1]*y+matrixRotationFila2[2]*w;
+
+        //printf("Punto rotado (%lf, %lf) \n", coords[i].longitud,coords[i].latitud);
+
+    }
+    //copyClippingArray();
+}
+
+
+
+
+//direction = 0 izquierda, 1 derecha
+void rotating(int direction, int specialMode){
+
+    double degrees;
+
+    if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
+        degrees  = 30.0;
+        if (direction==0){    //Rotación izquierda    
+            
+            rotateUniverse(degrees); //Rota 30 grados
+        }else {   //Rotacion derecha
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees);
+        }
+        printf("Rotacion rapida \n");
+        
+    }else if (specialMode == GLUT_ACTIVE_CTRL){
+        degrees  = 5.0;
+        printf("Rotacion lenta \n");
+        if (direction==0){    //Rotación izquierda    
+            rotateUniverse(degrees);
+        }else {   //Rotacion derecha
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees);
+        }  
+    }else { //Modo normal
+        degrees  = 10.0;
+        if (direction==0){    //Rotación izquierda    
+            rotateUniverse(degrees);
+        }else {     //Rotacion derecha
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees); 
+        }
+        
+        printf("Rotacion normal\n");
+    }
+}
+
 
 /*
     mode{0==NORMAL, 1 slow y 2 fast}
@@ -198,56 +450,103 @@ void zooming(unsigned int typeZoom, int specialMode){
 */
 void processKeyPressed(unsigned char key, int x, int y){
 
-    int modoTecla = glutGetModifiers();
+    int specialMode = glutGetModifiers();
+
+    if (inputEnable==0){
+        printf("Input rechazado \n");
+        return; //Se rechaza;
+    }else{
+        //disableKeyboardAndMouse();
+    }
 
     switch (key){
 
-        case 97: //Se presiona a Zoom In
-            zooming(1,modoTecla);
+        case 73: //Se presiona a Zoom In - i mayúscula
+        printf("I presionada \n");
+            zooming(1,specialMode);
             break;
 
-        case 100:  //Se presiona d Zoom Out
-            zooming(1,modoTecla);
+        case 105:  //Se presiona d Zoom In - i minúscula
+        printf("i presionada \n");
+            zooming(1,specialMode);
             break;
-    }        
+        case 79: 
+            printf("O presionada \n");
+            zooming(0,specialMode); //SE presiona Zoom out - o mayúscula
+            break;
+
+        case 111:
+        printf("o presionada \n");
+            zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+            break;
+
+        case 82: //R mayúscula- Rotate right
+            printf("R presionada \n");
+            rotating(1,specialMode);
+            break;
+
+        case 114: //r minúscula- Rotate right
+            printf("r presionada \n");
+            rotating(1,specialMode);
+            break;
+
+        case 76: //L mayúscula - Rotate left
+            printf("L presionada \n");
+            rotating(0,specialMode);
+            break;
+
+        case 108: //l minúscula - Rotate left
+            printf("l presionada \n");
+            rotating(0,specialMode);
+            break; 
+        case 27:
+            printf("Ventana reseteada \n");
+            resetValues();
+            break;
+    }
+    //enableKeyboardAndMouse();        
 }
 
 void specialKeys(int key, int x, int y){
 
     int specialMode = glutGetModifiers();
     int directionPan;
+
+    if (inputEnable==0){
+        printf("Input rechazado \n");
+        return; //Se rechaza;
+    }else{
+        //disableKeyboardAndMouse(); //lo desactiva al entrar en otra operacion;
+    }
+
+
     switch (key){
 
         case GLUT_KEY_UP:
-            directionPan = 0;
+            directionPan = 1;
             printf("Panning up \n");
             panning  (directionPan, specialMode);
             break;
 
         case GLUT_KEY_DOWN:
-            directionPan = 1;
+            directionPan = 0;
             printf("Panning down \n");
             panning  (directionPan, specialMode);
             break;
 
         case GLUT_KEY_RIGHT:
-            directionPan = 2;
+            directionPan = 3;
             printf("Panning right \n");
             panning  (directionPan, specialMode);
             break;
 
         case GLUT_KEY_LEFT:
-            directionPan = 3;
+            directionPan = 2;
             printf("Panning left \n");
             panning (directionPan, specialMode);
             break;
-        case GLUT_KEY_F11: //Se presiona a Zoom In
-            zooming(1,specialMode);
-            break;
 
-        case GLUT_KEY_F12:  //Se presiona d Zoom Out
-            zooming(0,specialMode);
-            break;
+
     }
 }
 
@@ -480,7 +779,25 @@ void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, doubl
 
         for (i=0;i<4;i++){
             if(p0Pos[i]+p1Pos[i]==2){
-                return; //Trivially rejected.
+                //Trivially rejected. Se debe igualar a bordes rechazados.
+                printf("Linea clipeada totalmente. Igualada a bordes\n");
+
+                switch(i){
+
+                    case 0: //Borde izquierdo
+                        *x0=edgeLeft;
+                        *x1=edgeLeft;
+                    case 1: //Borde derecho
+                        *x0=edgeRight;
+                        *x1=edgeRight;
+                    case 2:  //Borde inferior
+                        *y0=edgeBottom;
+                        *y1=edgeBottom;
+                    case 3: //Borde superior
+                        *y0=edgeTop;
+                        *y1=edgeTop;
+                }
+
             }else if (p0Pos[i]+p1Pos[i]==1){
                 orResult[i]=1; //Two shots at once, let's make OR operation.
             }
@@ -549,6 +866,11 @@ void calculateMinMax(int vertexAmount){
         Ymin = min(Ymin, coords[i].latitud);
         Ymax = max(Ymax, coords[i].latitud);
     }
+
+    XminTemp = Xmin;
+    XmaxTemp = Xmax;
+    YminTemp = Ymin;
+    YmaxTemp = Ymax;
 }
 
 void drawHorLine (int x0, int x1, int y){ //Garantizado ser más rápido que Bresenham.
@@ -571,8 +893,8 @@ void scanlineFill (int vertexAmount, struct Coord *pCoords, void (*f)(int,int), 
    
     //Mapeo a puntos del framebuffer. 
     for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin)));
-        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin)));
+        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - YminTemp) / (YmaxTemp - YminTemp)));
+        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - XminTemp) / (XmaxTemp - XminTemp)));
     }
 
     Xf[vertexAmount] = Xf[0];
@@ -633,8 +955,8 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
     int Xf[vertexAmount+1];
 
     for(i = 0; i < vertexAmount; i++){
-        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - Ymin) / (Ymax - Ymin))); 
-        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - Xmin) / (Xmax - Xmin))); 
+        Yf[i] = (int) (res * ((pCoords[counter + i].latitud - YminTemp) / (YmaxTemp - YminTemp))); 
+        Xf[i] = (int) (res * ((pCoords[counter + i].longitud - XminTemp) / (XmaxTemp - XminTemp))); 
     }
 
     Yf[vertexAmount] = Yf[0];
@@ -645,9 +967,11 @@ void delineate(int vertexAmount, struct Coord *pCoords, void (*f)(int,int), int 
     }
 }
 
-//Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. AL leerlas del archivo establece todo con el mapa completo. 
+
 void readFiles(){
 
+    //Actualiza el arreglo global dinámico que almacenará las coordenadas universales actuales. 
+    //AL leerlas del archivo establece todo con el mapa completo. 
     char *provinces[7] = {"mapa/Puntarenas.txt",
                           "mapa/Alajuela.txt",
                           "mapa/Limon.txt", 
@@ -679,6 +1003,7 @@ void readFiles(){
     
     //coords = (struct Coord*)calloc(totalVertexCount, sizeof(struct Coord));
     coords = malloc(sizeof(struct Coord)*totalVertexCount);
+    coordsTemp = malloc(sizeof(struct Coord)*totalVertexCount);
 
     for(k = 0; k < ptp; k++){
         FILE* g = fopen(provinces[k], "r");
@@ -727,38 +1052,97 @@ void allScanlines (struct Coord *pParam, int pColores) {
     }
 }
 
+
+
+
+
+
+void clipPolygons(){
+
+    copyClippingArray();
+
+    int j=0;
+    double x0=0;
+    double x1=0;
+    double y0=0;
+    double y1=0;
+
+    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+
+        if (i==vertexAmounts[j]){
+            j++;
+            continue; //SIguiente iteracion;
+        }
+        if (i!=totalVertexCount-1){
+
+
+
+            //printf("Linea a cortar de (%lf,%lf) a (%lf, %lf) \n", coordsTemp[i].longitud, coordsTemp[i].latitud, coordsTemp[i+1].longitud, coordsTemp[i+1].latitud);
+            //printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", Xmin, Ymin, Xmax, Ymax);
+            x0 = coordsTemp[i].longitud; 
+            y0 = coordsTemp[i].latitud;
+            x1 = coordsTemp[i+1].longitud; 
+            y1 = coordsTemp[i+1].latitud;
+
+            //liangBarsky(Xmin, Xmax, Ymin, Ymax, x0, y0, x1, y1, &x0, &y0, &x1, &y1 );
+            cohenSutherland(Xmin, Xmax, Ymin, Ymax, &x0, &y0, &x1, &y1); 
+            
+            coordsTemp[i].longitud = x0;
+            coordsTemp[i].latitud = y0;
+            coordsTemp[i+1].longitud =x1; 
+            coordsTemp[i+1].latitud = y1;
+            //cohenSutherland(Xmin, Xmax, Ymin, Ymax, &coordsTemp[i].longitud, &coordsTemp[i].latitud, &coordsTemp[i+1].longitud, &coordsTemp[i+1].latitud); 
+            //printf("Linea cortada de (%lf,%lf) a (%lf, %lf) \n", coordsTemp[i].longitud, coordsTemp[i].latitud, coordsTemp[i+1].longitud, coordsTemp[i+1].latitud);
+     
+        }
+    }
+}
+void renderScreen(){
+
+    //clipPolygons();
+    
+    allScanlines(coordsTemp, 1);
+    allBorders(coordsTemp, 1);
+    //glFlush();
+    glutSwapBuffers();
+}
+
+
 void renderScene(void){
 
     glClearColor(0.0f, 0.0f, 0.0f ,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //printf("Xmin: %lf \t Ymin: %lf \n Xmax: %lf \t Ymax: %lf", Xmin, Ymin, Xmax, Ymax);
-    allScanlines(coords, 1);
-    allBorders(coords, 1);
-    glFlush();
-    glutSwapBuffers();
+    renderScreen();
+    
 }
+
+
+
 
 int main(int argc, char *argv[]){
     buffer = (COLOR **)malloc(res * sizeof(COLOR*));
     
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(res,res);
     glutCreateWindow("CG Proyecto 1");
     glClear(GL_COLOR_BUFFER_BIT);
     gluOrtho2D(-0.5, res +0.5, -0.5, res + 0.5);
 
     readFiles();
-    allScanlines(coords, 1);
-    allBorders(coords, 1);
+    clipPolygons();
+    allScanlines(coordsTemp, 1);
+    allBorders(coordsTemp, 1);
 
     glFlush();
 
     glutMouseFunc(mouse);
     glutKeyboardFunc(processKeyPressed);
     glutDisplayFunc(renderScene);
-    glutIdleFunc(renderScene); //Llama a renderScene cuando el glut no tiene comandos en buffer;
+    //glutIdleFunc(renderScene); //Llama a renderScene cuando el glut no tiene comandos en buffer;
     glutSpecialFunc(specialKeys);
+    glutReshapeFunc(resize);
 
     glutMainLoop();
 }
