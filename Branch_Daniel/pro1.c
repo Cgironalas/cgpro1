@@ -376,7 +376,7 @@ void rotating(int direction, int specialMode){
         }
         
         printf("Rotacion lenta \n");
-    }else{ //Modo normal
+    }else if{ //Modo normal
 
         degrees  = 10.0/180.0;
         if (direction==0){    //Rotación izquierda    
