@@ -206,7 +206,7 @@ void panEntireScene(unsigned int direction, double percentage){
         }
     }else{//Es paneo vertical
         
-        double yDelta = Ymax-Ymin;
+        double yDelta = YmaxTemp-YminTemp;
         if (direction==0){ //Es para arriba
 
             YmaxTemp-= yDelta * percentage;
@@ -250,10 +250,10 @@ void zoomScene(double zoomScale){
     //Cálculo del punto central de la ventana actual
     calculateCenterPoint();
 
-    XminTemp = ((Xmin-xCenter)*zoomScale)+xCenter;
-    YminTemp =((Ymin-yCenter)*zoomScale)+yCenter;
-    XmaxTemp =((Xmax-xCenter)*zoomScale)+xCenter;
-    YmaxTemp =((Ymax-yCenter)*zoomScale)+yCenter;
+    XminTemp = ((XminTemp-xCenter)*zoomScale)+xCenter;
+    YminTemp =((YminTemp-yCenter)*zoomScale)+yCenter;
+    XmaxTemp =((XmaxTemp-xCenter)*zoomScale)+xCenter;
+    YmaxTemp =((YmaxTemp-yCenter)*zoomScale)+yCenter;
 
     printf("Centro: (%f, %f) \n", xCenter,yCenter);
     printf("Zoom con escala %f \n", zoomScale);
@@ -268,18 +268,26 @@ void zoomScene(double zoomScale){
 
 
 int validateZoom(double zoomScale){
-    //Regresa 0 si la operacion si se puede realizar.
-    //1 si no se puede realizar.
-    //Recibe la cantidad de escalas que se pretende realizar.
-    //Esta escala es negativa si se quiere hacer zoom in y
-    //positiva si se quiere hacer zoom out.
-    //REALIZA EL CAMBIO DEL CONTADOR AUTOMÁTICAMENTE.
-    if(zoomInLimit<=(zoomActual+zoomScale)<=zoomOutLimit){
-        zoomActual=zoomActual+zoomScale; //Altera contador
-        printf("zoomActual: %lf \n", zoomActual);
-        return 0; //SI se puede realiza
+    /*Regresa 0 si la operacion si se puede realizar.
+    1 si no se puede realizar.
+    Recibe la cantidad de escalas que se pretende realizar.
+    Esta escala es negativa si se quiere hacer zoom in y
+    positiva si se quiere hacer zoom out.
+    REALIZA EL CAMBIO DEL CONTADOR AUTOMÁTICAMENTE.
+    */
+    double temp = zoomActual;
+    printf("Zoom Temp: %lf \n", (temp+zoomScale));
+    if(zoomInLimit<=(temp+zoomScale)){ //No se pasa del limite de ZoomIn?
+
+        if(zoomOutLimit>=(temp+zoomScale)){ //No se pasa del limite de ZoomOut?
+            zoomActual=temp+zoomScale; //Altera contador
+            printf("Valido - zoomActual: %lf \n", zoomActual);
+            return 0; //Sí se puede realizar
+        }else{
+            return 1; //Se pasa del limite de zoomOut
+        }
     }else{
-        return 1;
+        return 1; //Se pasa del limite de zoomIn
     }
 }
 
@@ -296,16 +304,22 @@ void zooming(int typeZoom, int specialMode){
         if (typeZoom==0){  //Zoom out
             printf("Zoom out \n");
             if(validateZoom(z)==1){ //Fuera de limites
+            /*Si es rápido y zoomIn, se le restan 3 al contador de zoom.
+            Lo mismo si es rápido y zoomOut, sólo que se le sumaría.
+            */
             return;
+            }else{
+                zoomScene(z);
             }
-            z=1/z;
-            zoomScene(z);
+            
         }else { //Zoom In
             printf("Zoom in \n");
+            z=1/z;
             if(validateZoom(-z)==1){ //Fuera de limites
                 return;
-            }
-            zoomScene(z);    
+            }else{
+                zoomScene(z);
+            }    
         }
     }else if (specialMode == GLUT_ACTIVE_CTRL){
 
@@ -314,16 +328,21 @@ void zooming(int typeZoom, int specialMode){
         if (typeZoom==0){  //Zoom out
             printf("Zoom out \n");
             if(validateZoom(z)==1){ //Fuera de limites
+            /*Si es lento y zoomIn, se le restan 1.5 al contador de zoom.
+            Lo mismo si es lento y zoomOut, sólo que se le sumaría.
+            */
             return;
+            }else{
+                zoomScene(z);
             }
-            z=1/z;
-            zoomScene(z);
         }else { //Zoom In
             printf("Zoom in \n");
             if(validateZoom(-z)==1){ //Fuera de limites
                 return;
+            }else{
+                z=1/z;
+                zoomScene(z);
             }
-            zoomScene(z);    
         }
     }else{ //Modo normal
 
@@ -331,16 +350,21 @@ void zooming(int typeZoom, int specialMode){
         if (typeZoom==0){  //Zoom out
             printf("Zoom out \n");
             if(validateZoom(z)==1){ //Fuera de limites
-            return;
+            /*Si es normal y zoomIn, se le restan 2 al contador de zoom.
+            Lo mismo si es normal y zoomOut, sólo que se le sumaría.
+            */
+                return;
+            }else{
+                zoomScene(z);
             }
-            z=1/z;
-            zoomScene(z);
         }else { //Zoom In
             printf("Zoom in \n");
             if(validateZoom(-z)==1){ //Fuera de limites
                 return;
-            }
-            zoomScene(z);    
+            }else{
+                z=1/z;
+                zoomScene(z);  
+            }    
         }
     }
 }
