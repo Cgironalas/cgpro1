@@ -20,6 +20,10 @@ static double XmaxTemp;
 static double YminTemp;
 static double YmaxTemp;
 
+static double xCenter;
+static double yCenter; 
+
+
 
 static int provinceCounter = 0;
 static int totalVertexCount = 0;
@@ -43,6 +47,7 @@ static double zoomOutLimit = 1/27;
 
 static double zoomScale =1; //Acumuladores
 static double panningMovement; //Acumuladores
+static double actualRotationDegree;
 
 typedef struct {
   double r;
@@ -109,7 +114,24 @@ void resize(int width, int height) {
     glutReshapeWindow(res, res);
 }
 
+void copyClippingArray(){
 
+    for (int i=0; i<totalVertexCount;i++){
+
+        coordsTemp[i].longitud = coords[i].longitud;
+        coordsTemp[i].latitud = coords[i].latitud;
+        coordsTemp[i].w = coords[i].w;
+    }
+}
+
+
+void calculateCenterPoint(){
+    xCenter = (Xmax-Xmin)/2;
+    yCenter = (Ymax-Ymin)/2;
+
+    xCenter+=Xmin;
+    yCenter+=Ymin;
+}
 
 
 /*
@@ -207,11 +229,7 @@ void panning(unsigned int directionPan , int specialMode){
 void zoomScene(){
 
     //Cálculo del punto central de la ventana actual
-    double xCenter = (Xmax-XminTemp)/2;
-    double yCenter = (Ymax-YminTemp)/2;
-
-    xCenter+=Xmin;
-    yCenter+=Ymin;
+    calculateCenterPoint();
 
     XminTemp = ((Xmin-xCenter)*zoomScale)+xCenter;
     YminTemp =((Ymin-yCenter)*zoomScale)+yCenter;
@@ -222,15 +240,21 @@ void zoomScene(){
     printf("Zoom con escala %f \n", zoomScale);
     printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", Xmin, Ymin, Xmax, Ymax);
     
-    //renderScreen();
-    enableKeyboardAndMouse();
+
 }
 
-/*
-    typeZoom{0 = Zoom Out, 1 = Zoom In }
-    specialMode = tecla de modo.
-*/
 
+
+
+void validateRotationAngle(){
+
+    if(actualRotationDegree>360.0){
+        actualRotationDegree=actualRotationDegree-360.0;
+    }
+    if(actualRotationDegree<0.0){
+        actualRotationDegree=360.0-actualRotationDegree;
+    }
+}
 
 void validateZoomScaleFactor(){
 
@@ -241,7 +265,6 @@ void validateZoomScaleFactor(){
         zoomScale=zoomInLimit;
     }
 }
-
 
 
 void zooming(int typeZoom, int specialMode){
@@ -283,6 +306,43 @@ void zooming(int typeZoom, int specialMode){
 void rotateUniverse(double degrees){
 
 
+    actualRotationDegree = actualRotationDegree - degrees;
+    //validateRotationAngle();
+    calculateCenterPoint();
+
+    double sinAngle=sin(actualRotationDegree);
+    double cosAngle=cos(actualRotationDegree);
+
+    printf("Grados acumulados: %lf \n", degrees);
+    printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
+    printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
+    printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
+    printf("Valor de rotación actual %lf \n", actualRotationDegree);
+    double matrixRotationFila0[3]={cosAngle, 
+        -sinAngle,
+        xCenter-xCenter*cosAngle+yCenter*sinAngle};
+    double matrixRotationFila1[3]={sinAngle, 
+        cosAngle, 
+        yCenter-xCenter*sinAngle-yCenter*cosAngle};
+    double matrixRotationFila2[3]={0.0,0.0,1.0};
+
+
+    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+
+        double x=coords[i].longitud;
+        double y=coords[i].latitud;
+        double w=coords[i].w;
+
+        //printf("Punto a rotar (%lf, %lf) \n", coords[i].longitud,coords[i].latitud);
+
+        coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
+        coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
+        coordsTemp[i].w=matrixRotationFila2[0]*x+matrixRotationFila2[1]*y+matrixRotationFila2[2]*w;
+
+        //printf("Punto rotado (%lf, %lf) \n", coords[i].longitud,coords[i].latitud);
+
+    }
+    //copyClippingArray();
 }
 
 
@@ -294,34 +354,36 @@ void rotating(int direction, int specialMode){
     double degrees;
 
     if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
-        degrees  = 30.0;
+        degrees  = 30.0/180.0;
         if (direction==0){    //Rotación izquierda    
             
-             //rotateUniverse(degrees); //Rota 30 grados
+             rotateUniverse(degrees); //Rota 30 grados
         }else {   //Rotacion derecha
-            degrees= 360.00 - degrees;
-            //rotateUniverse(degrees);
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees);
         }
         
         printf("Rotacion rapida \n");
         
     }else if (specialMode == GLUT_ACTIVE_CTRL){ //Lenta
 
-        degrees  = 5.0;
+        degrees  = 5.0/180.0;
         if (direction==0){    //Rotación izquierda    
-            //zoomScene(1/z); 
+            rotateUniverse(degrees);
         }else {   //Rotacion derecha
-            //zoomScene(z);  
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees);
         }
         
         printf("Rotacion lenta \n");
     }else{ //Modo normal
 
-        degrees  = 15.0;
+        degrees  = 10.0/180.0;
         if (direction==0){    //Rotación izquierda    
-            //zoomScene(1/z); 
+            rotateUniverse(degrees);
         }else {     //Rotacion derecha
-            //zoomScene(z);  
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees); 
         }
         
         printf("Rotacion normal\n");
@@ -341,7 +403,7 @@ void processKeyPressed(unsigned char key, int x, int y){
         printf("Input rechazado \n");
         return; //Se rechaza;
     }else{
-        disableKeyboardAndMouse();
+        //disableKeyboardAndMouse();
     }
 
     switch (key){
@@ -366,21 +428,26 @@ void processKeyPressed(unsigned char key, int x, int y){
             break;
 
         case 82: //R mayúscula- Rotate right
-        printf("R presionada \n");
+            printf("R presionada \n");
+            rotating(1,specialMode);
             break;
 
         case 114: //r minúscula- Rotate left
-        printf("r presionada \n");
+            printf("r presionada \n");
+            rotating(1,specialMode);
             break;
 
         case 76: //L mayúscula - Rotate left
-        printf("L presionada \n");
+            printf("L presionada \n");
+            rotating(0,specialMode);
             break;
 
         case 108: //l minúscula - Rotate left
-        printf("l presionada \n");
+            printf("l presionada \n");
+            rotating(0,specialMode);
             break; 
-    }           
+    }
+    //enableKeyboardAndMouse();        
 }
 
 void specialKeys(int key, int x, int y){
@@ -392,7 +459,7 @@ void specialKeys(int key, int x, int y){
         printf("Input rechazado \n");
         return; //Se rechaza;
     }else{
-        disableKeyboardAndMouse(); //lo desactiva al entrar en otra operacion;
+        //disableKeyboardAndMouse(); //lo desactiva al entrar en otra operacion;
     }
 
 
@@ -925,15 +992,7 @@ void allScanlines (struct Coord *pParam, int pColores) {
     }
 }
 
-void copyClippingArray(){
 
-    for (int i=0; i<totalVertexCount;i++){
-
-        coordsTemp[i].longitud = coords[i].longitud;
-        coordsTemp[i].latitud = coords[i].latitud;
-        coordsTemp[i].w = coords[i].w;
-    }
-}
 
 
 void clipPolygons(){
