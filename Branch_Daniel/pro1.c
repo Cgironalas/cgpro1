@@ -47,8 +47,6 @@ static struct Coord *coordsTemp;
 static int zoomInLimit = -6;
 static int zoomOutLimit = 12;
 static double zoomActual = 0; //
-
-static double panningMovement; //Acumuladores
 static double actualRotationDegree; //Acumulador de rotación 
 
 typedef struct {

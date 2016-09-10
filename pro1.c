@@ -58,6 +58,8 @@ static int zoomOutLimit = 12;
 static double zoomActual = 0; //
 static double actualRotationDegree; //Acumulador de rotación 
 
+static double movementProggression = 5.0; //Número de "pasos" que se dan en las operaciones
+
 
 typedef struct {
   double r;
@@ -159,33 +161,136 @@ void mouse(int button, int state, int x, int y){
     }
 }
 
+
+
+
+void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, double newYmax){
+    /*direction {0 = up, 
+     1 = down, 
+     2= right, 
+     3 = left}
+    */
+    double yDelta;
+    double xDelta;
+
+    if(newYmin>YminTemp){  //Es un paneo vertical de subida?
+        yDelta=(newYmin-YminTemp);
+        printf("Recorrido en el eje y:  %lf \n", yDelta);
+
+        double yAdvance = yDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                YminTemp = newYmin; //Evitar imprecisión floating point
+                YmaxTemp = newYmax;
+            }
+            YminTemp+=yAdvance;
+            YmaxTemp+=yAdvance;
+            renderScreen();
+        }
+
+
+
+    }else if(newYmin<YminTemp){ //Es un paneo vertical de bajada?
+        yDelta=(newYmin-YminTemp);
+        printf("Recorrido en el eje y:  %lf \n", yDelta);
+
+        double yAdvance = yDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                YminTemp = newYmin; //Evitar imprecisión floating point
+                YmaxTemp = newYmax;
+            }
+            YminTemp+=yAdvance;
+            YmaxTemp+=yAdvance;
+            renderScreen();
+        }
+
+        
+
+
+    }else if(newXmin>XminTemp){  //Es un paneo horizontal hacia la derecha?
+        xDelta=(newXmin-XminTemp);
+        printf("Recorrido en el eje x:  %lf \n", xDelta);
+
+        double xAdvance = xDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                XminTemp = newXmin; //Evitar imprecisión floating point
+                XmaxTemp = newXmax;
+            }
+            XminTemp+=xAdvance;
+            XmaxTemp+=xAdvance;
+            renderScreen();
+        }
+
+    }else if(newXmin<XminTemp){ //Es un paneo horizontal hacia la izquierda?
+        xDelta=(newXmin-XminTemp);
+        printf("Recorrido en el eje x:  %lf \n", xDelta);
+
+        double xAdvance = xDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                XminTemp = newXmin; //Evitar imprecisión floating point
+                XmaxTemp = newXmax;
+            }
+            XminTemp+=xAdvance;
+            XmaxTemp+=xAdvance;
+            renderScreen();
+        }
+    }
+
+
+
+
+}
+
+
+
+
 void panEntireScene(unsigned int direction, double percentage){
     /*mode{0==NORMAL, 1 slow y 2 fast}
     direction {0 = up, 1 = down, 2= right, 3 = left}
     0.0 percentage < 1.0 para evitar división
     */
+
+    double newXminTemp, newYminTemp, newXmaxTemp, newYmaxTemp;
+
+    newXminTemp = XminTemp;
+    newXmaxTemp = XmaxTemp;
+    newYminTemp = YminTemp;
+    newYmaxTemp = YmaxTemp;
+
     if (direction== 2 || direction==3){ //Es paneo horizontal
         double xDelta=XmaxTemp-XminTemp;
 
-        if (direction==2){ //Es para la derecha
-            XmaxTemp-= xDelta * percentage;
-            XminTemp-= xDelta * percentage;
-        }else{ //Es para la izquierda
+        if (direction==2){ //Es para la izquierda
+            newXmaxTemp-= xDelta * percentage;
+            newXminTemp-= xDelta * percentage;
 
-            XmaxTemp+= xDelta * percentage;
-            XminTemp+= xDelta * percentage;
+            progressiveMotionPanning(newXminTemp, newXmaxTemp, YminTemp, YmaxTemp);
+        }else{ //Es para la derecha
+
+            newXmaxTemp+= xDelta * percentage;
+            newXminTemp+= xDelta * percentage;
+            progressiveMotionPanning(newXminTemp, newXmaxTemp, YminTemp, YmaxTemp);
         }
     }else{//Es paneo vertical
         
         double yDelta = YmaxTemp-YminTemp;
-        if (direction==0){ //Es para arriba
+        if (direction==0){ //Es para abajo
 
-            YmaxTemp-= yDelta * percentage;
-            YminTemp-= yDelta * percentage;
-        }else{ //Es para abajo
+            newYmaxTemp-= yDelta * percentage;
+            newYminTemp-= yDelta * percentage;
+            progressiveMotionPanning(XminTemp, XmaxTemp, newYminTemp, newYmaxTemp);
+        }else{ //Es para arriba
 
-            YmaxTemp+= yDelta * percentage;
-            YminTemp+= yDelta * percentage;
+            newYmaxTemp+= yDelta * percentage;
+            newYminTemp+= yDelta * percentage;
+            progressiveMotionPanning(XminTemp, XmaxTemp, newYminTemp, newYmaxTemp);
         }
     }
 
@@ -1202,7 +1307,12 @@ void clipPolygons(){
 void renderScreen(){
 
     //clipPolygons();
-    
+    if (rave){ 
+        glClearColor((float)(rand() % 255)/255 , (float)(rand() % 255)/255 , (float)(rand() % 255)/255   ,1.0f); 
+    }else { 
+        glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f); 
+    }
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     allScanlines(coordsTemp, 1);
     allBorders(coordsTemp);
     //glFlush();
@@ -1210,12 +1320,7 @@ void renderScreen(){
 }
 
 void renderScene(void){
-    if (rave){ 
-        glClearColor((float)(rand() % 255)/255 , (float)(rand() % 255)/255 , (float)(rand() % 255)/255   ,1.0f); 
-    }else { 
-        glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f); 
-    }
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
     renderScreen();
 }
 
