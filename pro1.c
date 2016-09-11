@@ -168,6 +168,7 @@ void resetValues(){
     zoomActual=0;
     scanLineFlag=0;
     textureFill=0;
+    rave=0;
 }
 
 void calculateCenterPoint(){
