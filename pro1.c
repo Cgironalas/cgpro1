@@ -60,7 +60,6 @@ static struct Coord *coordsTemp;
 static int zoomInLimit = -6;
 static int zoomOutLimit = 12;
 static double zoomActual = 0; //
-static double actualRotationDegree; //Acumulador de rotación 
 
 static double movementProggression = 10.0; //Número de "pasos" que se dan en las operaciones
 
@@ -164,7 +163,6 @@ void resetValues(){
     YminTemp = Ymin;
     YmaxTemp = Ymax;
 
-    actualRotationDegree=0.0;
     zoomActual=0;
     scanLineFlag=0;
     textureFill=0;
@@ -526,34 +524,24 @@ void zooming(int typeZoom, int specialMode){
     
 }
 
-//NO USADA POR EL MOMENTO.
-void validateRotationAngle(){
 
-    if(actualRotationDegree>360.0){
-        actualRotationDegree=actualRotationDegree-360.0;
-    }
-    if(actualRotationDegree<0.0){
-        actualRotationDegree=360.0-actualRotationDegree;
-    }
-}
 
 
 void progressiveMotionRotation(double degrees){
     //Se le suma al acumulador
-        actualRotationDegree = actualRotationDegree + degrees;
         //validateRotationAngle();
         calculateCenterPoint();
         double val=PI/180;
         //Se vuelve a radianes al meterlo a las funciones
-        double sinAngle=sin(actualRotationDegree*val);
-        double cosAngle=cos(actualRotationDegree*val);
+        double sinAngle=sin(degrees*val);
+        double cosAngle=cos(degrees*val);
         /*
         printf("Grados acumulados: %lf \n", degrees);
         printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
         printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
         printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
-        printf("Valor de rotación actual %lf \n", actualRotationDegree);
-        */
+        */printf("Valor de rotación actual %lf \n", degrees);
+        
         double matrixRotationFila0[3]={cosAngle, 
             -sinAngle,
             xCenter-(xCenter*cosAngle)+(yCenter*sinAngle)};
@@ -563,9 +551,9 @@ void progressiveMotionRotation(double degrees){
         double matrixRotationFila2[3]={0.0,0.0,1.0};
 
         for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
-            double x=coords[i].longitud;
-            double y=coords[i].latitud;
-            double w=coords[i].w;
+            double x=coordsTemp[i].longitud;
+            double y=coordsTemp[i].latitud;
+            double w=coordsTemp[i].w;
 
             coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
             coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
