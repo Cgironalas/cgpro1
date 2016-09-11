@@ -9,6 +9,9 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 
+
+#define PI 3.14159265
+
 static int resX = 1000;
 static int resY;
 
@@ -41,7 +44,8 @@ static int ptp = 7;
 static int vertexAmounts[7];
 static int errTs[7] = {0};
 static int rave = 0;
-static int textureFill = 0;
+static int textureFill  = 0;
+static int scanLineFlag = 0;
 
 struct Coord {
     double longitud;
@@ -62,6 +66,7 @@ static double movementProggression = 10.0; //Número de "pasos" que se dan en la
 
 //Bandera que indica si el movimiento debe ser progresivo o no
 static unsigned int movementActivated = 1; 
+
 
 
 typedef struct {
@@ -99,7 +104,7 @@ void disableKeyboardAndMouse(){
     inputEnable = 0;
 }
 
-void enableKeyboardAndMouse(){
+void enableKeyboardAndMouse(void){
     inputEnable = 1;
 }
 
@@ -109,10 +114,25 @@ void changeMovementFlag(){
     }else{
         movementActivated=1;
     }
-    enableKeyboardAndMouse();
+    
 }
 
+void activateScanlineFlag(){
+    scanLineFlag=1;
+    textureFill=0;
+    
+}
 
+void activateLinesOnly(){
+    scanLineFlag=0;
+    textureFill=0;
+    
+}
+
+void activateTextures(){
+    scanLineFlag=1;
+    textureFill=1;    
+}
 
 
 void resize(int width, int height) {
@@ -146,6 +166,8 @@ void resetValues(){
 
     actualRotationDegree=0.0;
     zoomActual=0;
+    scanLineFlag=0;
+    textureFill=0;
 }
 
 void calculateCenterPoint(){
@@ -340,7 +362,6 @@ void panning(unsigned int directionPan , int specialMode){
     }else{ //Modo normal
         panEntireScene(directionPan, 0.125);
     }
-    enableKeyboardAndMouse();
 }
 
 
@@ -435,7 +456,6 @@ void zooming(int typeZoom, int specialMode){
             /*Si es rápido y zoomIn, se le restan 3 al contador de zoom.
             Lo mismo si es rápido y zoomOut, sólo que se le sumaría.
             */
-                enableKeyboardAndMouse();
                 return;
             }else{
                 zoomScene(z);
@@ -445,7 +465,7 @@ void zooming(int typeZoom, int specialMode){
             printf("Zoom in \n");
             
             if(validateZoom(-z)==1){ //Fuera de limites
-                enableKeyboardAndMouse();
+                
                 return;
             }else{
                 z=1/z;
@@ -462,7 +482,7 @@ void zooming(int typeZoom, int specialMode){
             /*Si es lento y zoomIn, se le restan 1.5 al contador de zoom.
             Lo mismo si es lento y zoomOut, sólo que se le sumaría.
             */
-                enableKeyboardAndMouse();
+                
                 return;
             }else{
                 zoomScene(z);
@@ -470,7 +490,7 @@ void zooming(int typeZoom, int specialMode){
         }else { //Zoom In
             printf("Zoom in \n");
             if(validateZoom(-z)==1){ //Fuera de limites
-                enableKeyboardAndMouse();
+                
                 return;
             }else{
                 z=1/z;
@@ -486,7 +506,7 @@ void zooming(int typeZoom, int specialMode){
             /*Si es normal y zoomIn, se le restan 2 al contador de zoom.
             Lo mismo si es normal y zoomOut, sólo que se le sumaría.
             */
-                enableKeyboardAndMouse();
+                
                 return;
             }else{
                 zoomScene(z);
@@ -494,7 +514,7 @@ void zooming(int typeZoom, int specialMode){
         }else { //Zoom In
             printf("Zoom in \n");
             if(validateZoom(-z)==1){ //Fuera de limites
-                enableKeyboardAndMouse();
+                
                 return;
             }else{
                 z=1/z;
@@ -502,7 +522,7 @@ void zooming(int typeZoom, int specialMode){
             }    
         }
     }
-    enableKeyboardAndMouse();
+    
 }
 
 //NO USADA POR EL MOMENTO.
@@ -517,64 +537,83 @@ void validateRotationAngle(){
 }
 
 
-void rotateUniverse(double degrees){
-
+void progressiveMotionRotation(double degrees){
     //Se le suma al acumulador
-    actualRotationDegree = actualRotationDegree + degrees;
-    //validateRotationAngle();
-    calculateCenterPoint();
+        actualRotationDegree = actualRotationDegree + degrees;
+        //validateRotationAngle();
+        calculateCenterPoint();
+        double val=PI/180;
+        //Se vuelve a radianes al meterlo a las funciones
+        double sinAngle=sin(actualRotationDegree*val);
+        double cosAngle=cos(actualRotationDegree*val);
+        /*
+        printf("Grados acumulados: %lf \n", degrees);
+        printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
+        printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
+        printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
+        printf("Valor de rotación actual %lf \n", actualRotationDegree);
+        */
+        double matrixRotationFila0[3]={cosAngle, 
+            -sinAngle,
+            xCenter-(xCenter*cosAngle)+(yCenter*sinAngle)};
+        double matrixRotationFila1[3]={sinAngle, 
+            cosAngle, 
+            yCenter-(xCenter*sinAngle)-(yCenter*cosAngle)};
+        double matrixRotationFila2[3]={0.0,0.0,1.0};
 
+        for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+            double x=coords[i].longitud;
+            double y=coords[i].latitud;
+            double w=coords[i].w;
 
-    //Se vuelve a radianes al meterlo a las funciones
-    double sinAngle=sin(actualRotationDegree/180.0);
-    double cosAngle=cos(actualRotationDegree/180.0);
+            coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
+            coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
+            coordsTemp[i].w=matrixRotationFila2[0]*x+matrixRotationFila2[1]*y+matrixRotationFila2[2]*w;
 
-    printf("Grados acumulados: %lf \n", degrees);
-    printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
-    printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
-    printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
-    printf("Valor de rotación actual %lf \n", actualRotationDegree);
-    double matrixRotationFila0[3]={cosAngle, 
-        -sinAngle,
-        xCenter-xCenter*cosAngle+yCenter*sinAngle};
-    double matrixRotationFila1[3]={sinAngle, 
-        cosAngle, 
-        yCenter-xCenter*sinAngle-yCenter*cosAngle};
-    double matrixRotationFila2[3]={0.0,0.0,1.0};
+        }
+        renderScreen();
+}
 
+void rotateUniverse(double degrees, int mode){
+    /*modo 3 si rapido
+    modo 2 si normal
+    modo 1 si lento
+    */
+    if (movementActivated==1){
 
-    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+        double degreesToMoveIteration = 0.50*mode;
+        printf("Grados por mover: %lf \n", degreesToMoveIteration);
+        double degreeIteration = degrees/degreesToMoveIteration;
+        printf("Iteraciones de rotación: %lf \n", degreeIteration);
+        for (int i=0;i<abs(degreeIteration); i++){
+            if (degrees<0.0){ //ROtacion hacia la izquierda
+                progressiveMotionRotation(-degreesToMoveIteration);
 
-        double x=coords[i].longitud;
-        double y=coords[i].latitud;
-        double w=coords[i].w;
-
-        //printf("Punto a rotar (%lf, %lf) \n", coords[i].longitud,coords[i].latitud);
-
-        coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
-        coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
-        coordsTemp[i].w=matrixRotationFila2[0]*x+matrixRotationFila2[1]*y+matrixRotationFila2[2]*w;
-
-        //printf("Punto rotado (%lf, %lf) \n", coords[i].longitud,coords[i].latitud);
-
+            }else if(degrees>0.0){ //Rotacion hacia la derecha
+                progressiveMotionRotation(degreesToMoveIteration);
+            }
+        }
+    }else{
+        progressiveMotionRotation(degrees);
     }
-    enableKeyboardAndMouse();
+  
+    
 }
 
 
-//direction = 0 izquierda, 1 derecha
-void rotating(int direction, int specialMode){
 
+void rotating(int direction, int specialMode){
+    //direction = 0 izquierda, 1 derecha
     double degrees;
 
     if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
         degrees  = 30.0;
         if (direction==0){    //Rotación izquierda    
             
-            rotateUniverse(degrees); //Rota 30 grados
+            rotateUniverse(degrees, 3); //Rota 30 grados
         }else {   //Rotacion derecha
             degrees= -1.0*degrees;
-            rotateUniverse(degrees);
+            rotateUniverse(degrees, 3);
         }
         printf("Rotacion rapida \n");
         
@@ -582,25 +621,38 @@ void rotating(int direction, int specialMode){
         degrees  = 5.0;
         
         if (direction==0){    //Rotación izquierda    
-            rotateUniverse(degrees);
+            rotateUniverse(degrees, 1);
         }else {   //Rotacion derecha
             degrees= -1.0*degrees;
-            rotateUniverse(degrees);
+            rotateUniverse(degrees, 1);
         } 
         printf("Rotacion lenta \n"); 
     }else { //Modo normal
         degrees  = 10.0;
         if (direction==0){    //Rotación izquierda    
-            rotateUniverse(degrees);
+            rotateUniverse(degrees,2);
         }else {     //Rotacion derecha
             degrees= -1.0*degrees;
-            rotateUniverse(degrees); 
+            rotateUniverse(degrees,2); 
         }
         
         printf("Rotacion normal\n");
     }
-    enableKeyboardAndMouse();
 }
+
+unsigned int validateInput(){
+
+    if (inputEnable==0){
+        printf("Input rechazado \n");
+        return 1; //Se rechaza;
+    }else{
+        disableKeyboardAndMouse();
+        return 0;
+    }
+
+}
+
+
 
 
 void processKeyPressed(unsigned char key, int x, int y){
@@ -610,107 +662,168 @@ void processKeyPressed(unsigned char key, int x, int y){
         direction {0 = Zoom Out, 1 = Zoom In }
     */
     int specialMode = glutGetModifiers();
-
-     if (inputEnable==0){
-        printf("Input rechazado \n");
-        return; //Se rechaza;
-    }else{
-        disableKeyboardAndMouse();
+    if (specialMode == GLUT_ACTIVE_CTRL){
+        return;
     }
-
+    
     switch (key){
-
-
         case 114:  //Se presiona r minúscula- rave
-            printf("r presionada \n");
-            rave=1;
-            enableKeyboardAndMouse();
+            if(validateInput()==0){
+                printf("r presionada \n");
+                rave=1;
+                
+            }
+            if(validateInput()==0){
+
+            }
             break;
 
         case 82:  //Se presiona R mayúscula- rave
-            printf("R presionada \n");
-            rave=1;
-            enableKeyboardAndMouse();
+            if(validateInput()==0){
+                printf("R presionada \n");
+                rave=1;
+                
+            }
+            
             break;
 
         case 110:  //Se presiona n minúscula
-            printf("n presionada \n");
-            rave=0;
-            textureFill=0;
-            enableKeyboardAndMouse();
+            if(validateInput()==0){
+                printf("n presionada \n");
+                rave=0;       
+            }
             break;
 
         case 78:  //Se presiona N mayúscula
-            printf("N presionada \n");
-            rave=0;
-            textureFill=0;
-            enableKeyboardAndMouse();
+            if(validateInput()==0){
+                printf("N presionada \n");
+                rave=0;
+            }
             break;
             
         case 116: //Se presiona t minúscula
-            printf("t presionada \n");
-            textureFill=1;
-            enableKeyboardAndMouse();
+            if(validateInput()==0){
+                printf("t presionada \n");
+                activateTextures();
+            }
             break;
 
         case 84: //Se presiona T mayúscula
-            printf("T presionada \n");
-            textureFill=1;
-            enableKeyboardAndMouse();
+            if(validateInput()==0){
+                printf("T presionada \n");
+                activateTextures();
+                
+            }
             break;
 
         case 73: //Se presiona a Zoom In - i mayúscula
-            printf("I presionada \n");
-            zooming(1,specialMode);
+            if(validateInput()==0){
+                printf("I presionada \n");
+                zooming(1,specialMode);
+            }
             break;
 
         case 105:  //Se presiona d Zoom In - i minúscula
-            printf("i presionada \n");
-            zooming(1,specialMode);
+            if(validateInput()==0){
+                printf("i presionada \n");
+                zooming(1,specialMode);
+            }
             break;
+
         case 79: 
-            printf("O presionada \n");
-            zooming(0,specialMode); //SE presiona Zoom out - o mayúscula
+            if(validateInput()==0){
+                printf("O presionada \n");
+                zooming(0,specialMode); //SE presiona Zoom out - o mayúscula
+            }
             break;
 
         case 111:
-            printf("o presionada \n");
-            zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+            if(validateInput()==0){
+                printf("o presionada \n");
+                zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+            }
             break;
 
         case 65: //A mayúscula- Rotate left
-            printf("A presionada \n");
-            rotating(0,specialMode);
+            if(validateInput()==0){
+                printf("A presionada \n");
+                rotating(0,specialMode);
+            }
             break;
 
         case 97: //a minúscula- Rotate left
-            printf("a presionada \n");
-            rotating(0,specialMode);
+            if(validateInput()==0){
+                printf("a presionada \n");
+                rotating(0,specialMode);
+            }
             break;
 
         case 68: //D mayúscula - Rotate right
-            printf("D presionada \n");
-            rotating(1,specialMode);
+            if(validateInput()==0){
+                printf("D presionada \n");
+                rotating(1,specialMode);
+            }
+            
             break;
 
         case 100: //d minúscula - Rotate right
-            printf("d presionada \n");
-            rotating(1,specialMode);
+            if(validateInput()==0){
+                printf("d presionada \n");
+                rotating(1,specialMode);
+            }
             break; 
 
-        case 27:
-            printf("Ventana reseteada \n");
-            resetValues();
+        case 27: //Escape presionado
+            printf("Programa finalizado \n");
+            exit(0);
+
+        case 32: //Barra espaciadora presionada
+            if(validateInput()==0){
+                resetValues();
+                printf("Ventana reseteada \n");
+            }
             break;
 
         case 77: //M mayúscula - Bandera de movimiento
-            printf("M presionada \n");
-            changeMovementFlag();
+            if(validateInput()==0){
+                printf("M presionada \n");
+                changeMovementFlag();
+            }
+            break;
 
         case 109: //m minúscula - Bandera de movimiento
-            printf("m presionada \n");
-            changeMovementFlag();
+            if(validateInput()==0){
+                printf("m presionada \n");
+                changeMovementFlag();
+            }
+            break;
 
+        case 70: //F mayúscula - fillScanline
+            if(validateInput()==0){
+                printf("f presionada \n");
+                activateScanlineFlag();
+            }
+            break;
+
+        case 102: //f minúscula - fillScanline
+            if(validateInput()==0){
+                printf("f presionada \n");
+                activateScanlineFlag();
+            }
+            break;
+        case 76: // L presionada // sólo lineas
+            if(validateInput()==0){
+                printf("L presionada \n");
+                activateLinesOnly();
+            }
+            break;
+
+        case 108: //l presionada - sólo lineas
+            if(validateInput()==0){
+                printf("l presionada \n");
+                activateLinesOnly();
+            }
+            break;
 
     }        
 }
@@ -720,37 +833,40 @@ void specialKeys(int key, int x, int y){
     int specialMode = glutGetModifiers();
     int directionPan;
 
-    if (inputEnable==0){
-        printf("Input rechazado \n");
-        return; //Se rechaza;
-    }else{
-        //disableKeyboardAndMouse(); //lo desactiva al entrar en otra operacion;
-    }
-
+    if (specialMode == GLUT_ACTIVE_CTRL){return;}
+    
     switch (key){
 
         case GLUT_KEY_UP:
-            directionPan = 1;
-            printf("Panning up \n");
-            panning  (directionPan, specialMode);
+            if(validateInput()==0){
+                directionPan = 1;
+                printf("Panning up \n");
+                panning  (directionPan, specialMode);
+            }
             break;
 
         case GLUT_KEY_DOWN:
-            directionPan = 0;
-            printf("Panning down \n");
-            panning  (directionPan, specialMode);
+            if(validateInput()==0){
+                directionPan = 0;
+                printf("Panning down \n");
+                panning  (directionPan, specialMode);
+            }
             break;
 
         case GLUT_KEY_RIGHT:
-            directionPan = 3;
-            printf("Panning right \n");
-            panning  (directionPan, specialMode);
+            if(validateInput()==0){
+                directionPan = 3;
+                printf("Panning right \n");
+                panning  (directionPan, specialMode);
+            }
             break;
 
         case GLUT_KEY_LEFT:
-            directionPan = 2;
-            printf("Panning left \n");
-            panning (directionPan, specialMode);
+            if(validateInput()==0){
+                directionPan = 2;
+                printf("Panning left \n");
+                panning (directionPan, specialMode);
+            }
             break;
 
     }
@@ -1401,7 +1517,9 @@ void renderScreen(){
         glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f); 
     }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    allScanlines(coordsTemp, 1);
+    if(scanLineFlag==1){
+        allScanlines(coordsTemp, 1); 
+    }
     allBorders(coordsTemp);
     //glFlush();
     glutSwapBuffers();
@@ -1444,7 +1562,7 @@ int main(int argc, char *argv[]){
         glutMouseFunc(mouse);
         glutKeyboardFunc(processKeyPressed);
         glutDisplayFunc(renderScene);
-        //glutIdleFunc(renderScene); //Llama a renderScene cuando el glut no tiene comandos en buffer;
+        glutIdleFunc(enableKeyboardAndMouse); //Llama a renderScene cuando el glut no tiene comandos en buffer;
         glutSpecialFunc(specialKeys);
         glutReshapeFunc(resize);
 
