@@ -178,24 +178,8 @@ void calculateCenterPoint(){
 }
 
 
-void mouse(int button, int state, int x, int y){
 
-    if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
-
-        if (state== GLUT_UP){
-            return;
-        }
-        int shiftPressed = glutGetModifiers();
-        if (shiftPressed==GLUT_ACTIVE_SHIFT){
-            
-            printf("Fast Scroll %s en (%d , %d ) \n", (button==3)? "Up":"Down", x, y);
-        }
-
-        printf("Scroll %s en (%d , %d ) \n", (button==3)? "Up":"Down", x, y);
-    }else{
-        //printf("Mouse click %s en (%d , %d ) \n", (state==GLUT_DOWN)? "Down":"Up", x, y);
-    }
-}
+//PANNING////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -271,9 +255,6 @@ void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, do
         }
     }
 }
-
-
-
 
 void panEntireScene(unsigned int direction, double percentage){
     /*mode{0==NORMAL, 1 slow y 2 fast}
@@ -388,6 +369,8 @@ void progressiveMotionZooming(double newXmin, double newXmax, double newYmin, do
         renderScreen();
     }  
 }
+
+//ZOOM////////////////////////////////////////////////////////////////////////////////////
 
 
 void zoomScene(double zoomScale){
@@ -524,7 +507,7 @@ void zooming(int typeZoom, int specialMode){
     
 }
 
-
+//ROTACION////////////////////////////////////////////////////////////////////////////////////
 
 
 void progressiveMotionRotation(double degrees){
@@ -585,10 +568,7 @@ void rotateUniverse(double degrees, int mode){
     }else{
         progressiveMotionRotation(degrees);
     }
-  
-    
 }
-
 
 
 void rotating(int direction, int specialMode){
@@ -629,6 +609,10 @@ void rotating(int direction, int specialMode){
     }
 }
 
+
+//TECLAS Y MOUSE//////////////////////////////////////////////////////////////////////////////
+
+
 unsigned int validateInput(){
 
     if (inputEnable==0){
@@ -638,11 +622,55 @@ unsigned int validateInput(){
         disableKeyboardAndMouse();
         return 0;
     }
-
 }
 
 
+void mouse(int button, int state, int x, int y){
+    if(validateInput()==0){
 
+        if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
+
+            if (state== GLUT_UP){
+                return;
+            }
+            int specialMode = glutGetModifiers();
+            if (specialMode == GLUT_ACTIVE_ALT){
+                return;
+            }
+            if (specialMode==GLUT_ACTIVE_SHIFT){
+                
+                if(button==3){
+                    printf("Fast Scroll Up \n");
+                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
+                }else{
+                    printf("Fast Scroll Down \n");
+                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+                }
+                
+            }
+            else if(specialMode==GLUT_ACTIVE_CTRL){
+                specialMode=GLUT_ACTIVE_ALT;
+                if(button==3){
+
+                    printf("Slow Scroll Up \n");
+                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
+                }else{
+                    printf("Slow Scroll Down \n");
+                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+                }
+            }else{
+                if(button==3){
+                    printf(" Scroll Up \n");
+                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
+                }else{
+                    printf(" Scroll Down \n");
+                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+                }
+            }
+
+        }  
+    }
+}
 
 void processKeyPressed(unsigned char key, int x, int y){
 
@@ -860,6 +888,9 @@ void specialKeys(int key, int x, int y){
 
     }
 }
+
+//LINEAS Y POLÍGONOS//////////////////////////////////////////////////////////////////////////////
+
 
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     //Trazo de la línea entre dos puntos.
