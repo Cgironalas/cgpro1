@@ -1140,8 +1140,10 @@ int cohenSutherlandOneEdge(int axis, int isMax, double edge, int numberVertexesI
                 //Comparaciones
                 if(x0 <= edge && x1 <= edge){//Caso Alpha
                     //Agrega el punto origen
-                    vertexesReturned[numberVertexesReturned]=vertexesInput[i];
-                    numberVertexesReturned++; 
+                    vertexesReturned[numberVertexesReturned].longitud=vertexesInput[i].longitud;
+                    vertexesReturned[numberVertexesReturned].latitud=vertexesInput[i].latitud;
+                    vertexesReturned[numberVertexesReturned].w=vertexesInput[i].w;
+                    numberVertexesReturned++;
 
                 }else if(x0 <= edge && x1 > edge){ //Caso beta
                     //Se agrega interseccion
@@ -1193,8 +1195,10 @@ int cohenSutherlandOneEdge(int axis, int isMax, double edge, int numberVertexesI
                 //Comparaciones
                 if(x0 >= edge && x1 >= edge){//Caso Alpha
                     //Agrega el punto origen
-                    vertexesReturned[numberVertexesReturned]=vertexesInput[i];
-                    numberVertexesReturned++; 
+                    vertexesReturned[numberVertexesReturned].longitud=vertexesInput[i].longitud;
+                    vertexesReturned[numberVertexesReturned].latitud=vertexesInput[i].latitud;
+                    vertexesReturned[numberVertexesReturned].w=vertexesInput[i].w;
+                    numberVertexesReturned++;
 
                 }else if(x0 >= edge && x1 < edge){ //Caso beta
                     //Se agrega interseccion
@@ -1248,7 +1252,9 @@ int cohenSutherlandOneEdge(int axis, int isMax, double edge, int numberVertexesI
                 //Comparaciones
                 if(y0 <= edge && y1 <= edge){//Caso Alpha
                     //Agrega el punto origen
-                    vertexesReturned[numberVertexesReturned]=vertexesInput[i];
+                    vertexesReturned[numberVertexesReturned].longitud=vertexesInput[i].longitud;
+                    vertexesReturned[numberVertexesReturned].latitud=vertexesInput[i].latitud;
+                    vertexesReturned[numberVertexesReturned].w=vertexesInput[i].w;
                     numberVertexesReturned++; 
 
                 }else if(y0 <= edge && y1 > edge){ //Caso beta
@@ -1299,8 +1305,10 @@ int cohenSutherlandOneEdge(int axis, int isMax, double edge, int numberVertexesI
                 //Comparaciones
                 if(y0 >= edge && y1 >= edge){//Caso Alpha
                     //Agrega el punto origen
-                    vertexesReturned[numberVertexesReturned]=vertexesInput[i];
-                    numberVertexesReturned++; 
+                    vertexesReturned[numberVertexesReturned].longitud=vertexesInput[i].longitud;
+                    vertexesReturned[numberVertexesReturned].latitud=vertexesInput[i].latitud;
+                    vertexesReturned[numberVertexesReturned].w=vertexesInput[i].w;
+                    numberVertexesReturned++;
                     
                 }else if(y0 >= edge && y1 < edge){ //Caso beta
                     //Se agrega interseccion
