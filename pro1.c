@@ -42,7 +42,11 @@ static int height = 128;
 static double geoT[9] = {1,0,0, 0,1,0, 0,0,1};
 static int ptp = 7;
 static int vertexAmounts[7];
-static int errTs[7] = {0};
+
+static int errTs[7] = {0}; //Algo de texeles
+
+
+//Banderas de modos. La ausencia de estos (0's) indica modo líneas.
 static int rave = 0;
 static int textureFill  = 0;
 static int scanLineFlag = 0;
@@ -57,12 +61,16 @@ static struct Coord *coords;
 static struct Border *borders;
 static struct Coord *coordsTemp;
 
+//CLipping related
+static int clippedVertexesAmounts[7];
+static struct Coord *clippedPoints;
+static int totalClippedVertexCount = 0;
+
+//Acumuladores y límitadores para zoom, rotación y smooth movement
 static int zoomInLimit = -6;
 static int zoomOutLimit = 12;
 static double zoomActual = 0; //
-
 static double movementProggression = 10.0; //Número de "pasos" que se dan en las operaciones
-
 //Bandera que indica si el movimiento debe ser progresivo o no
 static unsigned int movementActivated = 1; 
 
@@ -75,6 +83,10 @@ typedef struct {
 } COLOR;
 
 COLOR **buffer;
+
+
+//ÓP BASICAS////////////////////////////////////////////////////////////////////////////////////
+
 
 void calculateResY(){
     
@@ -99,33 +111,28 @@ void plot (int x, int y){
     glEnd();
 }
 
-void disableKeyboardAndMouse(){
-    inputEnable = 0;
-}
 
-void enableKeyboardAndMouse(void){
-    inputEnable = 1;
-}
+void disableKeyboardAndMouse(){inputEnable = 0; }
+
+
+void enableKeyboardAndMouse(void){inputEnable = 1;}
 
 void changeMovementFlag(){
     if (movementActivated==1){
         movementActivated=0;
     }else{
         movementActivated=1;
-    }
-    
+    }  
 }
 
 void activateScanlineFlag(){
     scanLineFlag=1;
     textureFill=0;
-    
 }
 
 void activateLinesOnly(){
     scanLineFlag=0;
-    textureFill=0;
-    
+    textureFill=0;    
 }
 
 void activateTextures(){
@@ -139,7 +146,8 @@ void resize(int width, int height) {
     glutReshapeWindow(resX, resY);
 }
 
-void copyClippingArray(){
+
+void copyTempPointsArray(){
 
     for (int i=0; i<totalVertexCount;i++){
 
@@ -149,14 +157,34 @@ void copyClippingArray(){
     }
 }
 
+void copyClippingArray(){
+
+    for (int i=0; i<totalVertexCount;i++){
+
+        clippedPoints[i].longitud = coordsTemp[i].longitud;
+        clippedPoints[i].latitud = coordsTemp[i].latitud;
+        clippedPoints[i].w = coordsTemp[i].w;
+    }
+}
+
+void copyArrayOfPointsIntoAnother(struct Coord *array1, struct Coord *array2, int array2Size){
+    /*Copia los puntos del arreglo 2 en el arreglo 1. 
+    */
+    for (int i = 0; i<array2Size; i++){
+        array1[i] = array2[i];
+    }
+}
+
+void appendArrayOfPointsIntoAnother(struct Coord *array1, int array1Size, struct Coord *array2, int array2Size){
+    for (int i=0;i<array2Size;i++){
+        array1[array1Size+i]=array2[i];
+    }
+}
+
 void resetValues(){
     
-    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
-
-        coordsTemp[i].longitud  = coords[i].longitud; 
-        coordsTemp[i].latitud  = coords[i].latitud; 
-        coordsTemp[i].w  = coords[i].w; 
-    }
+    copyTempPointsArray();
+    copyClippingArray();
 
     XminTemp = Xmin;
     XmaxTemp = Xmax;
@@ -182,15 +210,13 @@ void calculateCenterPoint(){
 //PANNING////////////////////////////////////////////////////////////////////////////////////
 
 
-
-
 void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, double newYmax){
     double yDelta;
     double xDelta;
 
     if(newYmin>YminTemp){  //Es un paneo vertical de subida?
         yDelta=(newYmin-YminTemp);
-        printf("Recorrido en el eje y:  %lf \n", yDelta);
+        //printf("Recorrido en el eje y:  %lf \n", yDelta);
 
         double yAdvance = yDelta/movementProggression;
         for (int i=0;i<movementProggression; i++){
@@ -206,7 +232,7 @@ void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, do
         }
     }else if(newYmin<YminTemp){ //Es un paneo vertical de bajada?
         yDelta=(newYmin-YminTemp);
-        printf("Recorrido en el eje y:  %lf \n", yDelta);
+        //printf("Recorrido en el eje y:  %lf \n", yDelta);
 
         double yAdvance = yDelta/movementProggression;
         for (int i=0;i<movementProggression; i++){
@@ -222,7 +248,7 @@ void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, do
         }
     }else if(newXmin>XminTemp){  //Es un paneo horizontal hacia la derecha?
         xDelta=(newXmin-XminTemp);
-        printf("Recorrido en el eje x:  %lf \n", xDelta);
+        //printf("Recorrido en el eje x:  %lf \n", xDelta);
 
         double xAdvance = xDelta/movementProggression;
         for (int i=0;i<movementProggression; i++){
@@ -239,7 +265,7 @@ void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, do
 
     }else if(newXmin<XminTemp){ //Es un paneo horizontal hacia la izquierda?
         xDelta=(newXmin-XminTemp);
-        printf("Recorrido en el eje x:  %lf \n", xDelta);
+        //printf("Recorrido en el eje x:  %lf \n", xDelta);
 
         double xAdvance = xDelta/movementProggression;
         for (int i=0;i<movementProggression; i++){
@@ -344,6 +370,7 @@ void panning(unsigned int directionPan , int specialMode){
     }
 }
 
+//ZOOM////////////////////////////////////////////////////////////////////////////////////
 
 void progressiveMotionZooming(double newXmin, double newXmax, double newYmin, double newYmax){
 
@@ -352,7 +379,6 @@ void progressiveMotionZooming(double newXmin, double newXmax, double newYmin, do
     double yMinAdvance=(newYmin-YminTemp)/movementProggression;
     double yMaxAdvance=(newYmax-YmaxTemp)/movementProggression;
 
-    printf("esquina inferior izquierda: %lf y %lf  \t esquina superior derecha: %lf y %lf \n", xMinAdvance, yMinAdvance, xMaxAdvance,yMaxAdvance );
 
     for (int i=0;i<movementProggression; i++){
         if (i+1==movementProggression){
@@ -369,8 +395,6 @@ void progressiveMotionZooming(double newXmin, double newXmax, double newYmin, do
         renderScreen();
     }  
 }
-
-//ZOOM////////////////////////////////////////////////////////////////////////////////////
 
 
 void zoomScene(double zoomScale){
@@ -395,8 +419,8 @@ void zoomScene(double zoomScale){
     }
     
 
-    printf("Centro: (%f, %f) \n", xCenter,yCenter);
-    printf("Zoom con escala %f \n", zoomScale);
+    //printf("Centro: (%f, %f) \n", xCenter,yCenter);
+    //printf("Zoom con escala %f \n", zoomScale);
 }
 
 int validateZoom(double zoomScale){
@@ -408,7 +432,6 @@ int validateZoom(double zoomScale){
     REALIZA EL CAMBIO DEL CONTADOR AUTOMÁTICAMENTE.
     */
     double temp = zoomActual;
-    printf("Zoom Temp: %lf \n", (temp+zoomScale));
     if(zoomInLimit<=(temp+zoomScale)){ //No se pasa del limite de ZoomIn?
 
         if(zoomOutLimit>=(temp+zoomScale)){ //No se pasa del limite de ZoomOut?
@@ -433,7 +456,6 @@ void zooming(int typeZoom, int specialMode){
         printf("Fast zooming \n");
         z  = 3;
         if (typeZoom==0){  //Zoom out
-            printf("Zoom out \n");
             if(validateZoom(z)==1){ //Fuera de limites
             /*Si es rápido y zoomIn, se le restan 3 al contador de zoom.
             Lo mismo si es rápido y zoomOut, sólo que se le sumaría.
@@ -444,7 +466,6 @@ void zooming(int typeZoom, int specialMode){
             }
             
         }else { //Zoom In
-            printf("Zoom in \n");
             
             if(validateZoom(-z)==1){ //Fuera de limites
                 
@@ -459,7 +480,6 @@ void zooming(int typeZoom, int specialMode){
         z=1.5;
         printf("Slow zooming \n");
         if (typeZoom==0){  //Zoom out
-            printf("Zoom out \n");
             if(validateZoom(z)==1){ //Fuera de limites
             /*Si es lento y zoomIn, se le restan 1.5 al contador de zoom.
             Lo mismo si es lento y zoomOut, sólo que se le sumaría.
@@ -470,7 +490,6 @@ void zooming(int typeZoom, int specialMode){
                 zoomScene(z);
             }
         }else { //Zoom In
-            printf("Zoom in \n");
             if(validateZoom(-z)==1){ //Fuera de limites
                 
                 return;
@@ -483,7 +502,6 @@ void zooming(int typeZoom, int specialMode){
 
         z=2;
         if (typeZoom==0){  //Zoom out
-            printf("Zoom out \n");
             if(validateZoom(z)==1){ //Fuera de limites
             /*Si es normal y zoomIn, se le restan 2 al contador de zoom.
             Lo mismo si es normal y zoomOut, sólo que se le sumaría.
@@ -494,7 +512,6 @@ void zooming(int typeZoom, int specialMode){
                 zoomScene(z);
             }
         }else { //Zoom In
-            printf("Zoom in \n");
             if(validateZoom(-z)==1){ //Fuera de limites
                 
                 return;
@@ -504,15 +521,17 @@ void zooming(int typeZoom, int specialMode){
             }    
         }
     }
-    
 }
+
 
 //ROTACION////////////////////////////////////////////////////////////////////////////////////
 
 
+
+
+
 void progressiveMotionRotation(double degrees){
-    //Se le suma al acumulador
-        //validateRotationAngle();
+        
         calculateCenterPoint();
         double val=PI/180;
         //Se vuelve a radianes al meterlo a las funciones
@@ -523,8 +542,7 @@ void progressiveMotionRotation(double degrees){
         printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
         printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
         printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
-        */printf("Valor de rotación actual %lf \n", degrees);
-        
+        */
         double matrixRotationFila0[3]={cosAngle, 
             -sinAngle,
             xCenter-(xCenter*cosAngle)+(yCenter*sinAngle)};
@@ -554,9 +572,7 @@ void rotateUniverse(double degrees, int mode){
     if (movementActivated==1){
 
         double degreesToMoveIteration = 0.50*mode;
-        printf("Grados por mover: %lf \n", degreesToMoveIteration);
         double degreeIteration = degrees/degreesToMoveIteration;
-        printf("Iteraciones de rotación: %lf \n", degreeIteration);
         for (int i=0;i<abs(degreeIteration); i++){
             if (degrees<0.0){ //ROtacion hacia la izquierda
                 progressiveMotionRotation(-degreesToMoveIteration);
@@ -569,7 +585,6 @@ void rotateUniverse(double degrees, int mode){
         progressiveMotionRotation(degrees);
     }
 }
-
 
 void rotating(int direction, int specialMode){
     //direction = 0 izquierda, 1 derecha
@@ -609,7 +624,6 @@ void rotating(int direction, int specialMode){
     }
 }
 
-
 //TECLAS Y MOUSE//////////////////////////////////////////////////////////////////////////////
 
 
@@ -622,10 +636,13 @@ unsigned int validateInput(){
         disableKeyboardAndMouse();
         return 0;
     }
+
 }
 
 
 void mouse(int button, int state, int x, int y){
+
+
     if(validateInput()==0){
 
         if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
@@ -672,12 +689,10 @@ void mouse(int button, int state, int x, int y){
     }
 }
 
+
 void processKeyPressed(unsigned char key, int x, int y){
 
-    /*
-        mode{0==NORMAL, 1 slow y 2 fast}
-        direction {0 = Zoom Out, 1 = Zoom In }
-    */
+
     int specialMode = glutGetModifiers();
     if (specialMode == GLUT_ACTIVE_CTRL){
         return;
@@ -689,9 +704,6 @@ void processKeyPressed(unsigned char key, int x, int y){
                 printf("r presionada \n");
                 rave=1;
                 
-            }
-            if(validateInput()==0){
-
             }
             break;
 
@@ -889,6 +901,7 @@ void specialKeys(int key, int x, int y){
     }
 }
 
+
 //LINEAS Y POLÍGONOS//////////////////////////////////////////////////////////////////////////////
 
 
@@ -1064,131 +1077,378 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
-//Algoritmo de clipeo con los vértices de la línea pasados POR VALOR.
-void cohenSutherland(double edgeLeft, double edgeRight, double edgeBottom, double edgeTop, double *x0, double *y0, double *x1, double *y1){
 
-    unsigned int p0Pos[4] = {0, 0 , 0, 0};
-    unsigned int p1Pos[4] = {0, 0 , 0, 0};
+/////CLIPPING//////////////////////////////////////////////////////////////////////////////
+
+double calculateYIntersection(double x0, double y0, double x1, double y1, double xEdge ){
+        double m = (double)((y1 - y0)/(x1- x0));
+        double b = (double)(y0 -(m*x0));
+        double yIntersection= (m*xEdge) + b;
+        return yIntersection;
+
+}
+
+double calculateXIntersection(double x0, double y0, double x1, double y1, double yEdge){
+        double m = (double)((y1 - y0)/(x1- x0));
+        double b = (double)(y0 -(m*x0));
+        double xIntersection = (yEdge - b)/m; 
+        return xIntersection;
+}
+
+int cohenSutherlandOneEdge(int axis, int isMax, int numberVertexesInput, struct Coord *vertexesInput, int numberVertexesReturned, struct Coord *vertexesReturned) {
+    /*Implementación de la comparación de una línea con el borde indicado.
+    Recibe el valor del borde en edge. axis indica el eje (0 para x. 1 para y's)
+    isMAx indica si el borde es un maximo (1 si lo es), por lo cual los puntos mayores a dicho eje seran puestos como fuera.
+    Recibe un arreglo de puntos de entrada con su cardinalidad y devuelve un arreglo de puntos de salida con su cardinalidad (esta como valor de retorno).
+    SI el punto es igual al borde, se considera dentro.
+    */
+
+    numberVertexesReturned=0;
+    double x0;
+    double x1;
+    double y0;
+    double y1;
+    if (axis==0){ // Es en x
+        double yIntersection;
+        if (isMax==1){ //Es un max
+            //Xmax
+            
+            //printf("xmax \n");
+            for (int i=0; i<numberVertexesInput;i++){ //Se recorren vertices.
+
+                x0=vertexesInput[i].longitud;
+                y0=vertexesInput[i].latitud;
+
+                if (i+1==numberVertexesInput){
+                    //Se toma el primer punto del arreglo como punto destino
+                    x1=vertexesInput[0].longitud;
+                    y1=vertexesInput[0].latitud;
+                }else{
+                    //Se toma el punto destino como el siguiente punto en el arreglo
+                    x1=vertexesInput[i+1].longitud;
+                    y1=vertexesInput[i+1].latitud;
+                }
+                //Comparaciones
+                if(x0 <= XmaxTemp && x1 <= XmaxTemp){//Caso Alpha
+                    //Agrega el punto destino
+                    vertexesReturned[numberVertexesReturned].longitud=x1;
+                    vertexesReturned[numberVertexesReturned].latitud=y1;
+                    vertexesReturned[numberVertexesReturned].w=1.0;
+                    numberVertexesReturned++;
+
+                }else if(x0 <= XmaxTemp && x1 > XmaxTemp){ //Caso beta
+                    //Se agrega interseccion
+
+                    //Para evitar x0-x1=0 en caso de lineas verticales
+                    if (y0==y1){ //Lineas horizontales
+                        yIntersection=y0;
+                    }else{
+                        yIntersection=calculateYIntersection(x0, y0, x1, y1, XmaxTemp);
+                    }
+                    //printf("CAlculando intersección xmax beta\n");
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    //printf("%lf \n", calculateYIntersection(x0, y0, x1, y1, XmaxTemp));
+                    vertexesReturned[numberVertexesReturned].longitud = XmaxTemp;
+                    vertexesReturned[numberVertexesReturned].latitud = yIntersection;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+
+                }else if(x0 > XmaxTemp && x1 > XmaxTemp){ //Caso gamma
+                    //No se agregan vertices
+                }else if(x0 > XmaxTemp && x1 <= XmaxTemp){ //CAso Delta
+                    //Se agrega interseccion
+                    if (y0==y1){ //Lineas horizontales
+                        yIntersection=y0;
+                    }else{
+                        yIntersection=calculateYIntersection(x0, y0, x1, y1, XmaxTemp);
+                    }
+                    //printf("CAlculando intersección xmax delta\n");
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    //printf("%lf \n", calculateYIntersection(x0, y0, x1, y1, XmaxTemp));
+                    vertexesReturned[numberVertexesReturned].longitud = XmaxTemp;
+                    vertexesReturned[numberVertexesReturned].latitud = yIntersection;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+                    //Se agrega destino
+                    vertexesReturned[numberVertexesReturned].longitud= x1;
+                    vertexesReturned[numberVertexesReturned].latitud= y1;
+                    vertexesReturned[numberVertexesReturned].w= 1.0;
+                    numberVertexesReturned++; 
+                }
+            }
+
+
+        }else{ //Es un min
+            //Xmin
     
-    for (int i = 0; i<4; i++){
-        switch(i){
-            case 0: //Left edge
-                if (*x0<edgeLeft){
-                    p0Pos[3]=1;
+            for (int i=0; i<numberVertexesInput;i++){ //Se recorren vertices.
+
+                x0=vertexesInput[i].longitud;
+                y0=vertexesInput[i].latitud;
+
+                if (i+1==numberVertexesInput){
+                    //Se toma el primer punto del arreglo como punto destino
+                    x1=vertexesInput[0].longitud;
+                    y1=vertexesInput[0].latitud;
+                }else{
+                    //Se toma el punto destino como el siguiente punto en el arreglo
+                    x1=vertexesInput[i+1].longitud;
+                    y1=vertexesInput[i+1].latitud;
                 }
+                //Comparaciones
+                if(x0 >= XminTemp && x1 >= XminTemp){//Caso Alpha
+                    //Agrega el punto destino
+                    vertexesReturned[numberVertexesReturned].longitud=x1;
+                    vertexesReturned[numberVertexesReturned].latitud=y1;
+                    vertexesReturned[numberVertexesReturned].w=1.0;
+                    numberVertexesReturned++;
 
-                if (*x1<edgeLeft){
-                    p1Pos[3]=1;
+                }else if(x0 >= XminTemp && x1 < XminTemp){ //Caso beta
+                    //Se agrega interseccion
+                    //printf("CAlculando intersección xmin beta\n");
+                    if (y0==y1){ //Lineas horizontales
+                        yIntersection=y0;
+                    }else{
+                        yIntersection=calculateYIntersection(x0, y0, x1, y1, XminTemp);
+                    }
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    vertexesReturned[numberVertexesReturned].longitud = XminTemp;
+                    vertexesReturned[numberVertexesReturned].latitud = yIntersection;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+                    //printf("%lf \n", yIntersection);
+
+                }else if(x0 < XminTemp && x1 < XminTemp){ //Caso gamma
+                    //No se agregan vertices
+                }else if(x0 < XminTemp && x1 >= XminTemp){ //CAso Delta
+                    //Se agrega interseccion
+                    if (y0==y1){ //Lineas horizontales
+                        yIntersection=y0;
+                    }else{
+                        yIntersection=calculateYIntersection(x0, y0, x1, y1, XminTemp);
+                    }
+                    //printf("CAlculando intersección xmin delta\n");
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    vertexesReturned[numberVertexesReturned].longitud = XminTemp;
+                    vertexesReturned[numberVertexesReturned].latitud =  yIntersection;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+                    //printf("%lf \n", yIntersection);
+                    //Se agrega destino
+                    vertexesReturned[numberVertexesReturned].longitud= x1;
+                    vertexesReturned[numberVertexesReturned].latitud= y1;
+                    vertexesReturned[numberVertexesReturned].w= 1.0;
+                    numberVertexesReturned++; 
                 }
+            }
 
-            case 1: //Right edge
-
-                if (*x0>edgeRight){
-                    p0Pos[2]=1;
-                }
-                if (*x1>edgeRight){
-                    p1Pos[2]=1;
-                }
-
-            case 2: //Bottom edge
-
-                if (*y0<edgeBottom){
-                    p0Pos[1]=1;
-                }
-                if (*y1<edgeBottom){
-
-                    p1Pos[1]=1;
-                }
-
-            case 3: //Top edge
-
-                if (*y0>edgeTop){
-                    p0Pos[0]=1;
-                }
-                if (*y0>edgeTop){
-
-                    p1Pos[0]=1;
-                }
         }
 
-        //AND Operation of the vertexes of the line
+    }else if(axis==1){ //Es en y
+        double xIntersection;
+        if (isMax==1){ //Es un max
+            //Ymax
+            //printf("ymax \n");
+            for (int i=0; i<numberVertexesInput;i++){ //Se recorren vertices.
 
-        unsigned int orResult[4] = {0, 0 , 0, 0};
+                x0=vertexesInput[i].longitud;
+                y0=vertexesInput[i].latitud;
 
-        for (i=0;i<4;i++){
-            if(p0Pos[i]+p1Pos[i]==2){
-                //Trivially rejected. Se debe igualar a bordes rechazados.
-                printf("Linea clipeada totalmente. Igualada a bordes\n");
+                if (i+1==numberVertexesInput){
+                    //Se toma el primer punto del arreglo como punto destino
+                    x1=vertexesInput[0].longitud;
+                    y1=vertexesInput[0].latitud;
+                }else{
+                    //Se toma el punto destino como el siguiente punto en el arreglo
+                    x1=vertexesInput[i+1].longitud;
+                    y1=vertexesInput[i+1].latitud;
+                }
+                //Comparaciones
+                if(y0 <= YmaxTemp && y1 <= YmaxTemp){//Caso Alpha
+                    //Agrega el punto destino
+                    vertexesReturned[numberVertexesReturned].longitud=x1;
+                    vertexesReturned[numberVertexesReturned].latitud=y1;
+                    vertexesReturned[numberVertexesReturned].w=1.0;
+                    numberVertexesReturned++; 
 
-                switch(i){
+                }else if(y0 <= YmaxTemp && y1 > YmaxTemp){ //Caso beta
+                    //Se agrega interseccion
+                    //printf("CAlculando intersección ymax beta\n");
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    if (x0==x1){ //Lineas verticales
+                        xIntersection=x0;
+                    }else{
+                        xIntersection=calculateXIntersection(x0, y0, x1, y1, YmaxTemp);
+                    }
+                    printf("%lf \n", xIntersection);
+                    vertexesReturned[numberVertexesReturned].longitud = xIntersection;
+                    vertexesReturned[numberVertexesReturned].latitud = YmaxTemp;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
 
-                    case 0: //Borde izquierdo
-                        *x0=edgeLeft;
-                        *x1=edgeLeft;
-                    case 1: //Borde derecho
-                        *x0=edgeRight;
-                        *x1=edgeRight;
-                    case 2:  //Borde inferior
-                        *y0=edgeBottom;
-                        *y1=edgeBottom;
-                    case 3: //Borde superior
-                        *y0=edgeTop;
-                        *y1=edgeTop;
+                }else if(y0 > YmaxTemp && y1 > YmaxTemp){ //Caso gamma
+                    //No se agregan vertices
+                }else if(y0 > YmaxTemp && y1 <= YmaxTemp){ //CAso Delta
+                    if (x0==x1){ //Lineas verticales
+                        xIntersection=x0;
+                    }else{
+                        xIntersection=calculateXIntersection(x0, y0, x1, y1, YmaxTemp);
+                    }
+                    //printf("CAlculando intersección ymax delta\n");
+                   // printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    //printf("%lf \n", xIntersection);
+                    vertexesReturned[numberVertexesReturned].longitud = xIntersection;
+                    vertexesReturned[numberVertexesReturned].latitud =YmaxTemp;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+                    //Se agrega destino
+                    vertexesReturned[numberVertexesReturned].longitud= x1;
+                    vertexesReturned[numberVertexesReturned].latitud= y1;
+                    vertexesReturned[numberVertexesReturned].w= 1.0;
+                    numberVertexesReturned++; 
+                }
+            }
+        }else{ //Es un min
+            //Ymin
+            //printf("ymin \n");
+            for (int i=0; i<numberVertexesInput;i++){ //Se recorren vertices.
+
+                x0=vertexesInput[i].longitud;
+                y0=vertexesInput[i].latitud;
+
+                if (i+1==numberVertexesInput){
+                    //Se toma el primer punto del arreglo como punto destino
+                    x1=vertexesInput[0].longitud;
+                    y1=vertexesInput[0].latitud;
+                }else{
+                    //Se toma el punto destino como el siguiente punto en el arreglo
+                    x1=vertexesInput[i+1].longitud;
+                    y1=vertexesInput[i+1].latitud;
                 }
 
-            }else if (p0Pos[i]+p1Pos[i]==1){
-                orResult[i]=1; //Two shots at once, let's make OR operation.
+                //Comparaciones
+                if(y0 >= YminTemp && y1 >= YminTemp){//Caso Alpha
+                    //Agrega el punto destino
+                    vertexesReturned[numberVertexesReturned].longitud=x1;
+                    vertexesReturned[numberVertexesReturned].latitud=y1;
+                    vertexesReturned[numberVertexesReturned].w=1.0;
+                    numberVertexesReturned++;
+                    
+                }else if(y0 >= YminTemp && y1 < YminTemp){ //Caso beta
+                    //Se agrega interseccion
+                    if (x0==x1){ //Lineas verticales
+                        xIntersection=x0;
+                    }else{
+                        xIntersection=calculateXIntersection(x0, y0, x1, y1, YminTemp);
+                    }
+                    //printf("CAlculando intersección ymin beta\n");
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    //printf("%lf \n", xIntersection);
+                    vertexesReturned[numberVertexesReturned].longitud = xIntersection;
+                    vertexesReturned[numberVertexesReturned].latitud = YminTemp;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+
+                }else if(y0 < YminTemp && y1 < YminTemp){ //Caso gamma
+                    //No se agregan vertices
+                }else if(y0 < YminTemp && y1 >= YminTemp){ //CAso Delta
+                    if (x0==x1){ //Lineas verticales
+                        xIntersection=x0;
+                    }else{
+                        xIntersection=calculateXIntersection(x0, y0, x1, y1, YminTemp);
+                    }
+                    //printf("CAlculando intersección ymin delta\n");
+                    //printf("(%lf, %lf) a (%lf, %lf)\n ",x0,y0, x1, y1);
+                    //printf("%lf \n", xIntersection);
+                    vertexesReturned[numberVertexesReturned].longitud = xIntersection;
+                    vertexesReturned[numberVertexesReturned].latitud = YminTemp;
+                    vertexesReturned[numberVertexesReturned].w=1.0; 
+                    numberVertexesReturned++; 
+                    //Se agrega destino
+                    vertexesReturned[numberVertexesReturned].longitud= x1;
+                    vertexesReturned[numberVertexesReturned].latitud= y1;
+                    vertexesReturned[numberVertexesReturned].w= 1.0;
+                    numberVertexesReturned++; 
+                }
             }
         }
+    }
+    return numberVertexesReturned;
+}
+
+
+int cohenSutherlandPolygon(double edgeLeft, double edgeRight, double edgeBottom, double edgeTop, struct Coord *linePoints, int totalVertexes) {
+    /*Algoritmo de clipeo de polígonos.
+    *linePoints es un puntero al arreglo con los vertices de la provincia
+    *totalVertexes es el numero de vertices recibidos por esta funcion, en otras palabras, los vertices totales de la provincia (poligono) a clippear. 
+    Devuelve la provincia clipeada para añadirla al nuevo arreglo de vertices por valor
+    y el número de vértices totales del polígono clipeado como valor de retorno normal. 
+    */ 
+    double verticeX;
+    double verticeY;
+    struct Coord arrayPointsClipped[totalVertexes*2]; //El que sale
+    struct Coord arrayPointsToClipped[totalVertexes*2]; //EL que entra
+    int pointsClippedReturned=0;
+    copyArrayOfPointsIntoAnother(arrayPointsToClipped, linePoints, totalVertexes);
+
+
+    //CLipeo Xmin
+    
+    pointsClippedReturned=cohenSutherlandOneEdge(0,  0, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
+    copyArrayOfPointsIntoAnother(arrayPointsToClipped, arrayPointsClipped, pointsClippedReturned);
+    totalVertexes=pointsClippedReturned;
+
+    //CLipeo Ymax
+    pointsClippedReturned=cohenSutherlandOneEdge(1,  1, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
+    copyArrayOfPointsIntoAnother(arrayPointsToClipped, arrayPointsClipped, pointsClippedReturned);
+    totalVertexes=pointsClippedReturned;
+
+    //CLipeo Xmax
+    pointsClippedReturned=cohenSutherlandOneEdge(0,  1, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
+    copyArrayOfPointsIntoAnother(arrayPointsToClipped, arrayPointsClipped, pointsClippedReturned);
+    totalVertexes=pointsClippedReturned;
+
+    //Clipeo Ymin 
+    pointsClippedReturned=cohenSutherlandOneEdge(1,  0, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
+
+    copyArrayOfPointsIntoAnother(linePoints, arrayPointsClipped, pointsClippedReturned);
+
+    return pointsClippedReturned;
+
+}
+
+void clipPolygons(){
+    /*btiene los polígonos de las provincias y los clipea, enviándolos a cohenSUtherlandPolygon
+    Algo importante es que el polígono que envía no incluye al vertice inicial como elemento final, ya que los algoritmos de clipeo no están programados para este escenario sino para una serie de vertices {A,B,C,D} y no {A,B,C,D,A}.
+    */
+    int counter = 0;
+    int i,k;
+    int sizePossibleProvinceClippedVertexes;
+    int totalClippedVertexesProvince;
+    //clippedPoints
+    totalClippedVertexCount=0;
+    //clippedVertexesAmounts
+
+
+    for(k = 0; k < ptp; k++){ //Recorre las 7 provincias
+        sizePossibleProvinceClippedVertexes = vertexAmounts[k] * 2;
+        struct Coord vertexesProvince[sizePossibleProvinceClippedVertexes]; //Lista de vertices de provincia. 
         
-        if (orResult[0]==0 && orResult[1]==0 && orResult[2]==0 && orResult[3]==0 ){
-            return; //Trivially accepted.
-        }else{
-            double m = ((*y1 - *y0)/(*x1- *x0));
-            double b = *y0 -(m)*(*x0);
-            //We calculate these values right now.
-
-            if (orResult[0]==1){ //Top Edge intersection.
-                if (p0Pos[0]==1){ //If the source point was outside
-                    *x0 = (edgeTop - b)/m;
-                    *y1=edgeTop;
-                }else{ //Or the destiny point
-                    *x1 = (edgeTop - b)/m;
-                    *y1=edgeTop;
-                }
-            }
-            if(orResult[1]==1){ //Bottom Edge intersection.
-                if (p0Pos[1]==1){ ///If the source point was outside
-                   *x0 = (edgeBottom - b)/m;
-                   *y0=edgeBottom;
-                }else{ //Or the destiny point
-                    *x1 = (edgeBottom - b)/m;
-                    *y1=edgeBottom;
-                }
-            }
-            if(orResult[2]==1){ //Right Edge intersection.
-                if (p0Pos[2]==1){ //If the source point was outside
-                    *y0 = m*(edgeRight) + b;
-                    *x0=edgeRight;
-                }else{ //Or the destiny point
-                    *y1 = m*(edgeRight) + b;
-                    *x1=edgeRight;
-                }
-            }
-            if(orResult[3]==1){ //Left Edge intersection.
-                if (p0Pos[2]==1){ //If the source point was outside
-                    *y0 = m*(edgeLeft) + b;
-                    *x0=edgeLeft;
-                }else{ //Or the destiny point
-                    *y1 = m*(edgeLeft) + b;
-                    *x1=edgeLeft;
-                }
-            }
+        for(i = 0; i < vertexAmounts[k]; i++){ //Recorre los vertices de cada provincia hasta el maximo
+            vertexesProvince[i]=coordsTemp[counter+i]; //Copia el punto
         }
+        counter += vertexAmounts[k];
 
-
+        totalClippedVertexesProvince = cohenSutherlandPolygon(XminTemp, XmaxTemp, YminTemp, YmaxTemp,vertexesProvince, vertexAmounts[k]);
+        appendArrayOfPointsIntoAnother(clippedPoints, totalClippedVertexCount, vertexesProvince, totalClippedVertexesProvince); //Se anexa el polígono clipeado de la provincia al arreglo total de vertices clipeados
+        clippedVertexesAmounts[k]=totalClippedVertexesProvince; //Se actualiza el arreglo de fin de vértices de cada provincia en el arreglo total de vertices clipeados.
+        totalClippedVertexCount+=totalClippedVertexesProvince; //Se suma el max de vertices clipeados
+        
     }
 }
+
+
+//SCANLINE, TEXTURAS Y DEMÁS//////////////////////////////////////////////////////////////
 
 void calculateMinMax(int vertexAmount){
     int i;
@@ -1419,7 +1679,7 @@ int readFiles(){
         
 
             vertexAmount = 0;
-            while ((c = getc(file)) != EOF){
+            while ((c = getc(file)) != EOF){ //Mientras el archivo siga teniendo algo
                 if(c == '\n'){
                     vertexAmount++;
                     totalVertexCount++;
@@ -1429,15 +1689,21 @@ int readFiles(){
             vertexAmount++;
             totalVertexCount++;
             fclose(file);
+            //printf("vertexAmount: %d \n", vertexAmount);
             vertexAmounts[i] = vertexAmount;
         }
         else {
             return 0;
         }
     }
+    for(i = 0; i < ptp; i++){
+        printf("vertexAmount: %d \n", vertexAmounts[i]);
+    }
+
     //coords = (struct Coord*)calloc(totalVertexCount, sizeof(struct Coord));
     coords = malloc(sizeof(struct Coord)*totalVertexCount);
     coordsTemp = malloc(sizeof(struct Coord)*totalVertexCount);
+    clippedPoints = malloc(sizeof(struct Coord)*(2*totalVertexCount));
 
     for(k = 0; k < ptp; k++){
         FILE* g = fopen(provinces[k], "r");
@@ -1469,8 +1735,8 @@ void allBorders (struct Coord *pParam) {//antes drawBorders
 
         glColor3f ( 1, 0, 0 ); 
         
-        delineate(vertexAmounts[i], pParam, plot, counter); 
-        counter += vertexAmounts[i]; 
+        delineate(clippedVertexesAmounts[i], pParam, plot, counter); 
+        counter += clippedVertexesAmounts[i]; 
     }
 }
 
@@ -1482,66 +1748,26 @@ void allScanlines (struct Coord *pParam, int pColores) {
         po = i;
         glColor3f ( ((double)i*50)/255 , 0, ((double)i+50)/255 ); 
 
-        scanlineFill(vertexAmounts[i], pParam, plot, counter);
-        counter += vertexAmounts[i];
+        scanlineFill(clippedVertexesAmounts[i], pParam, plot, counter);
+        counter += clippedVertexesAmounts[i];
     }
 }
 
-void clipPolygons(){
 
-    copyClippingArray();
-
-    int j=0;
-    double x0=0;
-    double x1=0;
-    double y0=0;
-    double y1=0;
-
-    for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
-
-        if (i==vertexAmounts[j]){
-            j++;
-            continue; //SIguiente iteracion;
-        }
-        if (i!=totalVertexCount-1){
-
-
-
-            //printf("Linea a cortar de (%lf,%lf) a (%lf, %lf) \n", coordsTemp[i].longitud, coordsTemp[i].latitud, coordsTemp[i+1].longitud, coordsTemp[i+1].latitud);
-            //printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", Xmin, Ymin, Xmax, Ymax);
-            x0 = coordsTemp[i].longitud; 
-            y0 = coordsTemp[i].latitud;
-            x1 = coordsTemp[i+1].longitud; 
-            y1 = coordsTemp[i+1].latitud;
-
-            //liangBarsky(Xmin, Xmax, Ymin, Ymax, x0, y0, x1, y1, &x0, &y0, &x1, &y1 );
-            cohenSutherland(Xmin, Xmax, Ymin, Ymax, &x0, &y0, &x1, &y1); 
-            
-            coordsTemp[i].longitud = x0;
-            coordsTemp[i].latitud = y0;
-            coordsTemp[i+1].longitud =x1; 
-            coordsTemp[i+1].latitud = y1;
-            //cohenSutherland(Xmin, Xmax, Ymin, Ymax, &coordsTemp[i].longitud, &coordsTemp[i].latitud, &coordsTemp[i+1].longitud, &coordsTemp[i+1].latitud); 
-            //printf("Linea cortada de (%lf,%lf) a (%lf, %lf) \n", coordsTemp[i].longitud, coordsTemp[i].latitud, coordsTemp[i+1].longitud, coordsTemp[i+1].latitud);
-     
-        }
-    }
-}
 
 void renderScreen(){
-
-    //clipPolygons();
+    
     if (rave){ 
         glClearColor((float)(rand() % 255)/255 , (float)(rand() % 255)/255 , (float)(rand() % 255)/255   ,1.0f); 
     }else { 
         glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f); 
     }
+    clipPolygons();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if(scanLineFlag==1){
-        allScanlines(coordsTemp, 1); 
+        allScanlines(clippedPoints, 1); 
     }
-    allBorders(coordsTemp);
-    //glFlush();
+    allBorders(clippedPoints);
     glutSwapBuffers();
 }
 
@@ -1560,6 +1786,7 @@ int main(int argc, char *argv[]){
         getTexels(ts[i],i);   
     }
     
+
     buffer = (COLOR **)malloc(resX * sizeof(COLOR*));
     
     if (readFiles() == 1){
@@ -1572,9 +1799,9 @@ int main(int argc, char *argv[]){
         else { glClearColor(67.0f/255, 148.0f/255, 240.0f/255, 1.0f);  }
         glClear(GL_COLOR_BUFFER_BIT);
         gluOrtho2D(-0.5, resX +0.5, -0.5, resY + 0.5);
-
-        clipPolygons();
+        copyTempPointsArray();
         allScanlines(coordsTemp, 1);
+
         allBorders(coordsTemp);
 
         glFlush();
