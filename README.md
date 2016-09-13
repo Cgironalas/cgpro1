@@ -46,5 +46,8 @@ Los comandos disponibles son:
 		Versión ralentizada de los zoom in y zoom out.
 	r - 
 		"Rave" hace que el fondo cambie constantemente de color. Discreción en caso de sensibilidad a este efecto. 
+	spacebar - 
+		Resetea el mapa a la posición orignal en que se cargó
 	esc - 
 		Cierra el programa.
+
