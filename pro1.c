@@ -111,9 +111,7 @@ void plot (int x, int y){
     glEnd();
 }
 
-
 void disableKeyboardAndMouse(){inputEnable = 0; }
-
 
 void enableKeyboardAndMouse(void){inputEnable = 1;}
 
@@ -140,12 +138,10 @@ void activateTextures(){
     textureFill=1;    
 }
 
-
 void resize(int width, int height) {
     // we ignore the params and do:
     glutReshapeWindow(resX, resY);
 }
-
 
 void copyTempPointsArray(){
 
@@ -205,706 +201,7 @@ void calculateCenterPoint(){
     yCenter+=YminTemp;
 }
 
-
-
-//PANNING////////////////////////////////////////////////////////////////////////////////////
-
-
-void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, double newYmax){
-    double yDelta;
-    double xDelta;
-
-    if(newYmin>YminTemp){  //Es un paneo vertical de subida?
-        yDelta=(newYmin-YminTemp);
-        //printf("Recorrido en el eje y:  %lf \n", yDelta);
-
-        double yAdvance = yDelta/movementProggression;
-        for (int i=0;i<movementProggression; i++){
-
-            if (i+1==movementProggression){
-                YminTemp = newYmin; //Evitar imprecisión floating point
-                YmaxTemp = newYmax;
-            }else{
-                YminTemp+=yAdvance;
-                YmaxTemp+=yAdvance;
-            }
-            renderScreen();
-        }
-    }else if(newYmin<YminTemp){ //Es un paneo vertical de bajada?
-        yDelta=(newYmin-YminTemp);
-        //printf("Recorrido en el eje y:  %lf \n", yDelta);
-
-        double yAdvance = yDelta/movementProggression;
-        for (int i=0;i<movementProggression; i++){
-
-            if (i+1==movementProggression){
-                YminTemp = newYmin; //Evitar imprecisión floating point
-                YmaxTemp = newYmax;
-            }else{
-                YminTemp+=yAdvance;
-                YmaxTemp+=yAdvance;
-            }
-            renderScreen();
-        }
-    }else if(newXmin>XminTemp){  //Es un paneo horizontal hacia la derecha?
-        xDelta=(newXmin-XminTemp);
-        //printf("Recorrido en el eje x:  %lf \n", xDelta);
-
-        double xAdvance = xDelta/movementProggression;
-        for (int i=0;i<movementProggression; i++){
-
-            if (i+1==movementProggression){
-                XminTemp = newXmin; //Evitar imprecisión floating point
-                XmaxTemp = newXmax;
-            }else{
-                XminTemp+=xAdvance;
-                XmaxTemp+=xAdvance;
-            }
-            renderScreen();
-        }
-
-    }else if(newXmin<XminTemp){ //Es un paneo horizontal hacia la izquierda?
-        xDelta=(newXmin-XminTemp);
-        //printf("Recorrido en el eje x:  %lf \n", xDelta);
-
-        double xAdvance = xDelta/movementProggression;
-        for (int i=0;i<movementProggression; i++){
-
-            if (i+1==movementProggression){
-                XminTemp = newXmin; //Evitar imprecisión floating point
-                XmaxTemp = newXmax;
-            }else{
-                XminTemp+=xAdvance;
-                XmaxTemp+=xAdvance;
-            }
-            renderScreen();
-        }
-    }
-}
-
-void panEntireScene(unsigned int direction, double percentage){
-    /*mode{0==NORMAL, 1 slow y 2 fast}
-    direction {0 = up, 1 = down, 2= right, 3 = left}
-    0.0 percentage < 1.0 para evitar división
-    */
-
-    double newXminTemp, newYminTemp, newXmaxTemp, newYmaxTemp;
-
-    newXminTemp = XminTemp;
-    newXmaxTemp = XmaxTemp;
-    newYminTemp = YminTemp;
-    newYmaxTemp = YmaxTemp;
-
-    if (direction== 2 || direction==3){ //Es paneo horizontal
-        double xDelta=XmaxTemp-XminTemp;
-
-        if (direction==2){ //Es para la izquierda
-            if (movementActivated==1){ //Movimiento progresivo activado
-                newXmaxTemp-= xDelta * percentage;
-                newXminTemp-= xDelta * percentage;
-                progressiveMotionPanning(newXminTemp, newXmaxTemp, YminTemp, YmaxTemp);
-            }else{//Movimiento progresivo desactivado
-                XmaxTemp-= xDelta * percentage;
-                XminTemp-= xDelta * percentage;
-            }
-            
-        }else{ //Es para la derecha
-            if (movementActivated==1){//Movimiento progresivo activado
-                newXmaxTemp+= xDelta * percentage;
-                newXminTemp+= xDelta * percentage;
-                progressiveMotionPanning(newXminTemp, newXmaxTemp, YminTemp, YmaxTemp);
-            }else{//Movimiento progresivo desactivado
-                XmaxTemp+= xDelta * percentage;
-                XminTemp+= xDelta * percentage;
-            }   
-
-            
-        }
-    }else{//Es paneo vertical
-        
-        double yDelta = YmaxTemp-YminTemp;
-        if (direction==0){ //Es para abajo
-            if (movementActivated==1){//Movimiento progresivo activado
-                newYmaxTemp-= yDelta * percentage;
-                newYminTemp-= yDelta * percentage;
-                progressiveMotionPanning(XminTemp, XmaxTemp, newYminTemp, newYmaxTemp);
-            }else{//Movimiento progresivo desactivado
-                YmaxTemp-= yDelta * percentage;
-                YminTemp-= yDelta * percentage;
-            }
-            
-        }else{ //Es para arriba
-
-            if (movementActivated==1){//Movimiento progresivo activado
-                newYmaxTemp+= yDelta * percentage;
-                newYminTemp+= yDelta * percentage;
-                progressiveMotionPanning(XminTemp, XmaxTemp, newYminTemp, newYmaxTemp);
-            }else{ //Movimiento progresivo desactivado
-                YmaxTemp+= yDelta * percentage;
-                YminTemp+= yDelta * percentage;
-            }
-            
-        }
-    }
-
-    printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", XminTemp, YminTemp, XmaxTemp, YmaxTemp);
-    
-}
-
-void panning(unsigned int directionPan , int specialMode){
-    /*directionPan {0 = up, 1 = down, 2= right, 3 = left}
-    specialMode = tecla de modo.
-    */
-    if (specialMode == GLUT_ACTIVE_SHIFT){
-        //{}
-        panEntireScene(directionPan, 0.3);
-
-        printf("Fast panning \n");
-        
-    }else if (specialMode == GLUT_ACTIVE_ALT){
-
-        printf("Slow panning \n");
-        panEntireScene(directionPan, 0.05);
-    }else{ //Modo normal
-        panEntireScene(directionPan, 0.125);
-    }
-}
-
-//ZOOM////////////////////////////////////////////////////////////////////////////////////
-
-void progressiveMotionZooming(double newXmin, double newXmax, double newYmin, double newYmax){
-
-    double xMinAdvance=(newXmin-XminTemp)/movementProggression;
-    double xMaxAdvance=(newXmax-XmaxTemp)/movementProggression;
-    double yMinAdvance=(newYmin-YminTemp)/movementProggression;
-    double yMaxAdvance=(newYmax-YmaxTemp)/movementProggression;
-
-
-    for (int i=0;i<movementProggression; i++){
-        if (i+1==movementProggression){
-            XminTemp = newXmin; //Evitar imprecisión floating point
-            XmaxTemp = newXmax;
-            YminTemp = newYmin;
-            YmaxTemp = newYmax;
-        }else{
-            XminTemp+=xMinAdvance;
-            XmaxTemp+=xMaxAdvance;
-            YminTemp+=yMinAdvance;
-            YmaxTemp+=yMaxAdvance;
-        }
-        renderScreen();
-    }  
-}
-
-
-void zoomScene(double zoomScale){
-
-    //Cálculo del punto central de la ventana actual
-    calculateCenterPoint();
-    double newXminTemp, newYminTemp, newXmaxTemp, newYmaxTemp;
-
-    if (movementActivated==1){ //Movimiento progresivo activado
-        newXminTemp = ((XminTemp-xCenter)*zoomScale)+xCenter;
-        newYminTemp =((YminTemp-yCenter)*zoomScale)+yCenter;
-        newXmaxTemp =((XmaxTemp-xCenter)*zoomScale)+xCenter;
-        newYmaxTemp =((YmaxTemp-yCenter)*zoomScale)+yCenter;
-        progressiveMotionZooming(newXminTemp, newXmaxTemp, newYminTemp, newYmaxTemp);
-
-    }else{ //Movimiento progresivo desactivado
-        XminTemp = ((XminTemp-xCenter)*zoomScale)+xCenter;
-        YminTemp =((YminTemp-yCenter)*zoomScale)+yCenter;
-        XmaxTemp =((XmaxTemp-xCenter)*zoomScale)+xCenter;
-        YmaxTemp =((YmaxTemp-yCenter)*zoomScale)+yCenter;
-
-    }
-    
-
-    //printf("Centro: (%f, %f) \n", xCenter,yCenter);
-    //printf("Zoom con escala %f \n", zoomScale);
-}
-
-int validateZoom(double zoomScale){
-    /*Regresa 0 si la operacion si se puede realizar.
-    1 si no se puede realizar.
-    Recibe la cantidad de escalas que se pretende realizar.
-    Esta escala es negativa si se quiere hacer zoom in y
-    positiva si se quiere hacer zoom out.
-    REALIZA EL CAMBIO DEL CONTADOR AUTOMÁTICAMENTE.
-    */
-    double temp = zoomActual;
-    if(zoomInLimit<=(temp+zoomScale)){ //No se pasa del limite de ZoomIn?
-
-        if(zoomOutLimit>=(temp+zoomScale)){ //No se pasa del limite de ZoomOut?
-            zoomActual=temp+zoomScale; //Altera contador
-            printf("Valido - zoomActual: %lf \n", zoomActual);
-            return 0; //Sí se puede realizar
-        }else{
-            return 1; //Se pasa del limite de zoomOut
-        }
-    }else{
-        return 1; //Se pasa del limite de zoomIn
-    }
-}
-
-void zooming(int typeZoom, int specialMode){
-    //Zoom out = typeZoom 0
-    //Zoom in = typeZoom 1
-    double z;
-
-    if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
-
-        printf("Fast zooming \n");
-        z  = 3;
-        if (typeZoom==0){  //Zoom out
-            if(validateZoom(z)==1){ //Fuera de limites
-            /*Si es rápido y zoomIn, se le restan 3 al contador de zoom.
-            Lo mismo si es rápido y zoomOut, sólo que se le sumaría.
-            */
-                return;
-            }else{
-                zoomScene(z);
-            }
-            
-        }else { //Zoom In
-            
-            if(validateZoom(-z)==1){ //Fuera de limites
-                
-                return;
-            }else{
-                z=1/z;
-                zoomScene(z);
-            }    
-        }
-    }else if (specialMode == GLUT_ACTIVE_ALT){
-
-        z=1.5;
-        printf("Slow zooming \n");
-        if (typeZoom==0){  //Zoom out
-            if(validateZoom(z)==1){ //Fuera de limites
-            /*Si es lento y zoomIn, se le restan 1.5 al contador de zoom.
-            Lo mismo si es lento y zoomOut, sólo que se le sumaría.
-            */
-                
-                return;
-            }else{
-                zoomScene(z);
-            }
-        }else { //Zoom In
-            if(validateZoom(-z)==1){ //Fuera de limites
-                
-                return;
-            }else{
-                z=1/z;
-                zoomScene(z);
-            }
-        }
-    }else{ //Modo normal
-
-        z=2;
-        if (typeZoom==0){  //Zoom out
-            if(validateZoom(z)==1){ //Fuera de limites
-            /*Si es normal y zoomIn, se le restan 2 al contador de zoom.
-            Lo mismo si es normal y zoomOut, sólo que se le sumaría.
-            */
-                
-                return;
-            }else{
-                zoomScene(z);
-            }
-        }else { //Zoom In
-            if(validateZoom(-z)==1){ //Fuera de limites
-                
-                return;
-            }else{
-                z=1/z;
-                zoomScene(z);  
-            }    
-        }
-    }
-}
-
-
-//ROTACION////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-void progressiveMotionRotation(double degrees){
-        
-        calculateCenterPoint();
-        double val=PI/180;
-        //Se vuelve a radianes al meterlo a las funciones
-        double sinAngle=sin(degrees*val);
-        double cosAngle=cos(degrees*val);
-        /*
-        printf("Grados acumulados: %lf \n", degrees);
-        printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
-        printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
-        printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
-        */
-        double matrixRotationFila0[3]={cosAngle, 
-            -sinAngle,
-            xCenter-(xCenter*cosAngle)+(yCenter*sinAngle)};
-        double matrixRotationFila1[3]={sinAngle, 
-            cosAngle, 
-            yCenter-(xCenter*sinAngle)-(yCenter*cosAngle)};
-        double matrixRotationFila2[3]={0.0,0.0,1.0};
-
-        for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
-            double x=coordsTemp[i].longitud;
-            double y=coordsTemp[i].latitud;
-            double w=coordsTemp[i].w;
-
-            coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
-            coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
-            coordsTemp[i].w=matrixRotationFila2[0]*x+matrixRotationFila2[1]*y+matrixRotationFila2[2]*w;
-
-        }
-        renderScreen();
-}
-
-void rotateUniverse(double degrees, int mode){
-    /*modo 3 si rapido
-    modo 2 si normal
-    modo 1 si lento
-    */
-    if (movementActivated==1){
-
-        double degreesToMoveIteration = 0.50*mode;
-        double degreeIteration = degrees/degreesToMoveIteration;
-        for (int i=0;i<abs(degreeIteration); i++){
-            if (degrees<0.0){ //ROtacion hacia la izquierda
-                progressiveMotionRotation(-degreesToMoveIteration);
-
-            }else if(degrees>0.0){ //Rotacion hacia la derecha
-                progressiveMotionRotation(degreesToMoveIteration);
-            }
-        }
-    }else{
-        progressiveMotionRotation(degrees);
-    }
-}
-
-void rotating(int direction, int specialMode){
-    //direction = 0 izquierda, 1 derecha
-    double degrees;
-
-    if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
-        degrees  = 30.0;
-        if (direction==0){    //Rotación izquierda    
-            
-            rotateUniverse(degrees, 3); //Rota 30 grados
-        }else {   //Rotacion derecha
-            degrees= -1.0*degrees;
-            rotateUniverse(degrees, 3);
-        }
-        printf("Rotacion rapida \n");
-        
-    }else if (specialMode == GLUT_ACTIVE_ALT){
-        degrees  = 5.0;
-        
-        if (direction==0){    //Rotación izquierda    
-            rotateUniverse(degrees, 1);
-        }else {   //Rotacion derecha
-            degrees= -1.0*degrees;
-            rotateUniverse(degrees, 1);
-        } 
-        printf("Rotacion lenta \n"); 
-    }else { //Modo normal
-        degrees  = 10.0;
-        if (direction==0){    //Rotación izquierda    
-            rotateUniverse(degrees,2);
-        }else {     //Rotacion derecha
-            degrees= -1.0*degrees;
-            rotateUniverse(degrees,2); 
-        }
-        
-        printf("Rotacion normal\n");
-    }
-}
-
-//TECLAS Y MOUSE//////////////////////////////////////////////////////////////////////////////
-
-
-unsigned int validateInput(){
-
-    if (inputEnable==0){
-        printf("Input rechazado \n");
-        return 1; //Se rechaza;
-    }else{
-        disableKeyboardAndMouse();
-        return 0;
-    }
-
-}
-
-
-void mouse(int button, int state, int x, int y){
-
-
-    if(validateInput()==0){
-
-        if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
-
-            if (state== GLUT_UP){
-                return;
-            }
-            int specialMode = glutGetModifiers();
-            if (specialMode == GLUT_ACTIVE_ALT){
-                return;
-            }
-            if (specialMode==GLUT_ACTIVE_SHIFT){
-                
-                if(button==3){
-                    printf("Fast Scroll Up \n");
-                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
-                }else{
-                    printf("Fast Scroll Down \n");
-                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
-                }
-                
-            }
-            else if(specialMode==GLUT_ACTIVE_CTRL){
-                specialMode=GLUT_ACTIVE_ALT;
-                if(button==3){
-
-                    printf("Slow Scroll Up \n");
-                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
-                }else{
-                    printf("Slow Scroll Down \n");
-                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
-                }
-            }else{
-                if(button==3){
-                    printf(" Scroll Up \n");
-                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
-                }else{
-                    printf(" Scroll Down \n");
-                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
-                }
-            }
-
-        }  
-    }
-}
-
-
-void processKeyPressed(unsigned char key, int x, int y){
-
-
-    int specialMode = glutGetModifiers();
-    if (specialMode == GLUT_ACTIVE_CTRL){
-        return;
-    }
-    
-    switch (key){
-        case 114:  //Se presiona r minúscula- rave
-            if(validateInput()==0){
-                printf("r presionada \n");
-                rave=1;
-                
-            }
-            break;
-
-        case 82:  //Se presiona R mayúscula- rave
-            if(validateInput()==0){
-                printf("R presionada \n");
-                rave=1;
-                
-            }
-            
-            break;
-
-        case 110:  //Se presiona n minúscula
-            if(validateInput()==0){
-                printf("n presionada \n");
-                rave=0;       
-            }
-            break;
-
-        case 78:  //Se presiona N mayúscula
-            if(validateInput()==0){
-                printf("N presionada \n");
-                rave=0;
-            }
-            break;
-            
-        case 116: //Se presiona t minúscula
-            if(validateInput()==0){
-                printf("t presionada \n");
-                activateTextures();
-            }
-            break;
-
-        case 84: //Se presiona T mayúscula
-            if(validateInput()==0){
-                printf("T presionada \n");
-                activateTextures();
-                
-            }
-            break;
-
-        case 73: //Se presiona a Zoom In - i mayúscula
-            if(validateInput()==0){
-                printf("I presionada \n");
-                zooming(1,specialMode);
-            }
-            break;
-
-        case 105:  //Se presiona d Zoom In - i minúscula
-            if(validateInput()==0){
-                printf("i presionada \n");
-                zooming(1,specialMode);
-            }
-            break;
-
-        case 79: 
-            if(validateInput()==0){
-                printf("O presionada \n");
-                zooming(0,specialMode); //SE presiona Zoom out - o mayúscula
-            }
-            break;
-
-        case 111:
-            if(validateInput()==0){
-                printf("o presionada \n");
-                zooming(0,specialMode); //SE presiona Zoom out - o minúscula
-            }
-            break;
-
-        case 65: //A mayúscula- Rotate left
-            if(validateInput()==0){
-                printf("A presionada \n");
-                rotating(0,specialMode);
-            }
-            break;
-
-        case 97: //a minúscula- Rotate left
-            if(validateInput()==0){
-                printf("a presionada \n");
-                rotating(0,specialMode);
-            }
-            break;
-
-        case 68: //D mayúscula - Rotate right
-            if(validateInput()==0){
-                printf("D presionada \n");
-                rotating(1,specialMode);
-            }
-            
-            break;
-
-        case 100: //d minúscula - Rotate right
-            if(validateInput()==0){
-                printf("d presionada \n");
-                rotating(1,specialMode);
-            }
-            break; 
-
-        case 27: //Escape presionado
-            printf("Programa finalizado \n");
-            exit(0);
-
-        case 32: //Barra espaciadora presionada
-            if(validateInput()==0){
-                resetValues();
-                printf("Ventana reseteada \n");
-            }
-            break;
-
-        case 77: //M mayúscula - Bandera de movimiento
-            if(validateInput()==0){
-                printf("M presionada \n");
-                changeMovementFlag();
-            }
-            break;
-
-        case 109: //m minúscula - Bandera de movimiento
-            if(validateInput()==0){
-                printf("m presionada \n");
-                changeMovementFlag();
-            }
-            break;
-
-        case 70: //F mayúscula - fillScanline
-            if(validateInput()==0){
-                printf("f presionada \n");
-                activateScanlineFlag();
-            }
-            break;
-
-        case 102: //f minúscula - fillScanline
-            if(validateInput()==0){
-                printf("f presionada \n");
-                activateScanlineFlag();
-            }
-            break;
-        case 76: // L presionada // sólo lineas
-            if(validateInput()==0){
-                printf("L presionada \n");
-                activateLinesOnly();
-            }
-            break;
-
-        case 108: //l presionada - sólo lineas
-            if(validateInput()==0){
-                printf("l presionada \n");
-                activateLinesOnly();
-            }
-            break;
-
-    }        
-}
-
-void specialKeys(int key, int x, int y){
-
-    int specialMode = glutGetModifiers();
-    int directionPan;
-
-    if (specialMode == GLUT_ACTIVE_CTRL){return;}
-    
-    switch (key){
-
-        case GLUT_KEY_UP:
-            if(validateInput()==0){
-                directionPan = 1;
-                printf("Panning up \n");
-                panning  (directionPan, specialMode);
-            }
-            break;
-
-        case GLUT_KEY_DOWN:
-            if(validateInput()==0){
-                directionPan = 0;
-                printf("Panning down \n");
-                panning  (directionPan, specialMode);
-            }
-            break;
-
-        case GLUT_KEY_RIGHT:
-            if(validateInput()==0){
-                directionPan = 3;
-                printf("Panning right \n");
-                panning  (directionPan, specialMode);
-            }
-            break;
-
-        case GLUT_KEY_LEFT:
-            if(validateInput()==0){
-                directionPan = 2;
-                printf("Panning left \n");
-                panning (directionPan, specialMode);
-            }
-            break;
-
-    }
-}
-
-
 //LINEAS Y POLÍGONOS//////////////////////////////////////////////////////////////////////////////
-
-
 void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     //Trazo de la línea entre dos puntos.
     int d2x,d2y,dx,dy,d,
@@ -1077,15 +374,12 @@ void bresenham (int x0, int y0, int x1, int y1, void (*plot)(int,int)){
     }
 }
 
-
 /////CLIPPING//////////////////////////////////////////////////////////////////////////////
-
 double calculateYIntersection(double x0, double y0, double x1, double y1, double xEdge ){
         double m = (double)((y1 - y0)/(x1- x0));
         double b = (double)(y0 -(m*x0));
         double yIntersection= (m*xEdge) + b;
         return yIntersection;
-
 }
 
 double calculateXIntersection(double x0, double y0, double x1, double y1, double yEdge){
@@ -1280,7 +574,7 @@ int cohenSutherlandOneEdge(int axis, int isMax, int numberVertexesInput, struct 
                     }else{
                         xIntersection=calculateXIntersection(x0, y0, x1, y1, YmaxTemp);
                     }
-                    printf("%lf \n", xIntersection);
+                    //printf("%lf \n", xIntersection);
                     vertexesReturned[numberVertexesReturned].longitud = xIntersection;
                     vertexesReturned[numberVertexesReturned].latitud = YmaxTemp;
                     vertexesReturned[numberVertexesReturned].w=1.0; 
@@ -1376,7 +670,6 @@ int cohenSutherlandOneEdge(int axis, int isMax, int numberVertexesInput, struct 
     return numberVertexesReturned;
 }
 
-
 int cohenSutherlandPolygon(double edgeLeft, double edgeRight, double edgeBottom, double edgeTop, struct Coord *linePoints, int totalVertexes) {
     /*Algoritmo de clipeo de polígonos.
     *linePoints es un puntero al arreglo con los vertices de la provincia
@@ -1392,18 +685,17 @@ int cohenSutherlandPolygon(double edgeLeft, double edgeRight, double edgeBottom,
     copyArrayOfPointsIntoAnother(arrayPointsToClipped, linePoints, totalVertexes);
 
 
-    //CLipeo Xmin
-    
+    //Clipeo Xmin
     pointsClippedReturned=cohenSutherlandOneEdge(0,  0, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
     copyArrayOfPointsIntoAnother(arrayPointsToClipped, arrayPointsClipped, pointsClippedReturned);
     totalVertexes=pointsClippedReturned;
 
-    //CLipeo Ymax
+    //Clipeo Ymax
     pointsClippedReturned=cohenSutherlandOneEdge(1,  1, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
     copyArrayOfPointsIntoAnother(arrayPointsToClipped, arrayPointsClipped, pointsClippedReturned);
     totalVertexes=pointsClippedReturned;
 
-    //CLipeo Xmax
+    //Clipeo Xmax
     pointsClippedReturned=cohenSutherlandOneEdge(0,  1, totalVertexes, arrayPointsToClipped, pointsClippedReturned, arrayPointsClipped);
     copyArrayOfPointsIntoAnother(arrayPointsToClipped, arrayPointsClipped, pointsClippedReturned);
     totalVertexes=pointsClippedReturned;
@@ -1414,11 +706,10 @@ int cohenSutherlandPolygon(double edgeLeft, double edgeRight, double edgeBottom,
     copyArrayOfPointsIntoAnother(linePoints, arrayPointsClipped, pointsClippedReturned);
 
     return pointsClippedReturned;
-
 }
 
 void clipPolygons(){
-    /*btiene los polígonos de las provincias y los clipea, enviándolos a cohenSUtherlandPolygon
+    /*Obtiene los polígonos de las provincias y los clipea, enviándolos a cohenSUtherlandPolygon
     Algo importante es que el polígono que envía no incluye al vertice inicial como elemento final, ya que los algoritmos de clipeo no están programados para este escenario sino para una serie de vertices {A,B,C,D} y no {A,B,C,D,A}.
     */
     int counter = 0;
@@ -1443,13 +734,10 @@ void clipPolygons(){
         appendArrayOfPointsIntoAnother(clippedPoints, totalClippedVertexCount, vertexesProvince, totalClippedVertexesProvince); //Se anexa el polígono clipeado de la provincia al arreglo total de vertices clipeados
         clippedVertexesAmounts[k]=totalClippedVertexesProvince; //Se actualiza el arreglo de fin de vértices de cada provincia en el arreglo total de vertices clipeados.
         totalClippedVertexCount+=totalClippedVertexesProvince; //Se suma el max de vertices clipeados
-        
     }
 }
 
-
 //SCANLINE, TEXTURAS Y DEMÁS//////////////////////////////////////////////////////////////
-
 void calculateMinMax(int vertexAmount){
     int i;
     Xmin = min(coords[0].longitud, coords[1].longitud);
@@ -1697,7 +985,7 @@ int readFiles(){
         }
     }
     for(i = 0; i < ptp; i++){
-        printf("vertexAmount: %d \n", vertexAmounts[i]);
+        //printf("vertexAmount: %d \n", vertexAmounts[i]);
     }
 
     //coords = (struct Coord*)calloc(totalVertexCount, sizeof(struct Coord));
@@ -1746,14 +1034,12 @@ void allScanlines (struct Coord *pParam, int pColores) {
 
     for(i = 0; i < ptp; i++){
         po = i;
-        glColor3f ( ((double)i*50)/255 , 0, ((double)i+50)/255 ); 
+        glColor3f ( 0 , ((double)i*50)/255, ((double)i+15)/255 ); 
 
         scanlineFill(clippedVertexesAmounts[i], pParam, plot, counter);
         counter += clippedVertexesAmounts[i];
     }
 }
-
-
 
 void renderScreen(){
     
@@ -1776,8 +1062,674 @@ void renderScene(void){
     renderScreen();
 }
 
-int main(int argc, char *argv[]){
+//PANNING////////////////////////////////////////////////////////////////////////////////////
+void progressiveMotionPanning(double newXmin, double newXmax, double newYmin, double newYmax){
+    double yDelta;
+    double xDelta;
 
+    if(newYmin>YminTemp){  //Es un paneo vertical de subida?
+        yDelta=(newYmin-YminTemp);
+        //printf("Recorrido en el eje y:  %lf \n", yDelta);
+
+        double yAdvance = yDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                YminTemp = newYmin; //Evitar imprecisión floating point
+                YmaxTemp = newYmax;
+            }else{
+                YminTemp+=yAdvance;
+                YmaxTemp+=yAdvance;
+            }
+            renderScreen();
+        }
+    }else if(newYmin<YminTemp){ //Es un paneo vertical de bajada?
+        yDelta=(newYmin-YminTemp);
+        //printf("Recorrido en el eje y:  %lf \n", yDelta);
+
+        double yAdvance = yDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                YminTemp = newYmin; //Evitar imprecisión floating point
+                YmaxTemp = newYmax;
+            }else{
+                YminTemp+=yAdvance;
+                YmaxTemp+=yAdvance;
+            }
+            renderScreen();
+        }
+    }else if(newXmin>XminTemp){  //Es un paneo horizontal hacia la derecha?
+        xDelta=(newXmin-XminTemp);
+        //printf("Recorrido en el eje x:  %lf \n", xDelta);
+
+        double xAdvance = xDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                XminTemp = newXmin; //Evitar imprecisión floating point
+                XmaxTemp = newXmax;
+            }else{
+                XminTemp+=xAdvance;
+                XmaxTemp+=xAdvance;
+            }
+            renderScreen();
+        }
+
+    }else if(newXmin<XminTemp){ //Es un paneo horizontal hacia la izquierda?
+        xDelta=(newXmin-XminTemp);
+        //printf("Recorrido en el eje x:  %lf \n", xDelta);
+
+        double xAdvance = xDelta/movementProggression;
+        for (int i=0;i<movementProggression; i++){
+
+            if (i+1==movementProggression){
+                XminTemp = newXmin; //Evitar imprecisión floating point
+                XmaxTemp = newXmax;
+            }else{
+                XminTemp+=xAdvance;
+                XmaxTemp+=xAdvance;
+            }
+            renderScreen();
+        }
+    }
+}
+
+void panEntireScene(unsigned int direction, double percentage){
+    /*mode{0==NORMAL, 1 slow y 2 fast}
+    direction {0 = up, 1 = down, 2= right, 3 = left}
+    0.0 percentage < 1.0 para evitar división
+    */
+
+    double newXminTemp, newYminTemp, newXmaxTemp, newYmaxTemp;
+
+    newXminTemp = XminTemp;
+    newXmaxTemp = XmaxTemp;
+    newYminTemp = YminTemp;
+    newYmaxTemp = YmaxTemp;
+
+    if (direction== 2 || direction==3){ //Es paneo horizontal
+        double xDelta=XmaxTemp-XminTemp;
+
+        if (direction==2){ //Es para la izquierda
+            if (movementActivated==1){ //Movimiento progresivo activado
+                newXmaxTemp-= xDelta * percentage;
+                newXminTemp-= xDelta * percentage;
+                progressiveMotionPanning(newXminTemp, newXmaxTemp, YminTemp, YmaxTemp);
+            }else{//Movimiento progresivo desactivado
+                XmaxTemp-= xDelta * percentage;
+                XminTemp-= xDelta * percentage;
+            }
+            
+        }else{ //Es para la derecha
+            if (movementActivated==1){//Movimiento progresivo activado
+                newXmaxTemp+= xDelta * percentage;
+                newXminTemp+= xDelta * percentage;
+                progressiveMotionPanning(newXminTemp, newXmaxTemp, YminTemp, YmaxTemp);
+            }else{//Movimiento progresivo desactivado
+                XmaxTemp+= xDelta * percentage;
+                XminTemp+= xDelta * percentage;
+            }   
+
+            
+        }
+    }else{//Es paneo vertical
+        
+        double yDelta = YmaxTemp-YminTemp;
+        if (direction==0){ //Es para abajo
+            if (movementActivated==1){//Movimiento progresivo activado
+                newYmaxTemp-= yDelta * percentage;
+                newYminTemp-= yDelta * percentage;
+                progressiveMotionPanning(XminTemp, XmaxTemp, newYminTemp, newYmaxTemp);
+            }else{//Movimiento progresivo desactivado
+                YmaxTemp-= yDelta * percentage;
+                YminTemp-= yDelta * percentage;
+            }
+            
+        }else{ //Es para arriba
+
+            if (movementActivated==1){//Movimiento progresivo activado
+                newYmaxTemp+= yDelta * percentage;
+                newYminTemp+= yDelta * percentage;
+                progressiveMotionPanning(XminTemp, XmaxTemp, newYminTemp, newYmaxTemp);
+            }else{ //Movimiento progresivo desactivado
+                YmaxTemp+= yDelta * percentage;
+                YminTemp+= yDelta * percentage;
+            }
+            
+        }
+    }
+    //printf("Ventana de (%lf,%lf) a (%lf, %lf) \n", XminTemp, YminTemp, XmaxTemp, YmaxTemp);
+}
+
+void panning(unsigned int directionPan , int specialMode){
+    /*directionPan {0 = up, 1 = down, 2= right, 3 = left}
+    specialMode = tecla de modo.*/
+    if (specialMode == GLUT_ACTIVE_SHIFT){
+        //printf("Fast panning \n");
+        panEntireScene(directionPan, 0.3);
+    }else if (specialMode == GLUT_ACTIVE_ALT){
+        //printf("Slow panning \n");
+        panEntireScene(directionPan, 0.05);
+    }else{ //Modo normal
+        panEntireScene(directionPan, 0.125);
+    }
+}
+
+//ROTACION////////////////////////////////////////////////////////////////////////////////////
+void progressiveMotionRotation(double degrees){
+        
+        calculateCenterPoint();
+        double val=PI/180;
+        //Se vuelve a radianes al meterlo a las funciones
+        double sinAngle=sin(degrees*val);
+        double cosAngle=cos(degrees*val);
+        /*
+        printf("Grados acumulados: %lf \n", degrees);
+        printf("Centro en (%lf, %lf) \n", xCenter, yCenter);
+        printf("Seno de %lf: %lf \n", actualRotationDegree, sinAngle);
+        printf("Coseno de %lf: %lf \n", actualRotationDegree, cosAngle);
+        */
+        double matrixRotationFila0[3]={cosAngle, 
+            -sinAngle,
+            xCenter-(xCenter*cosAngle)+(yCenter*sinAngle)};
+        double matrixRotationFila1[3]={sinAngle, 
+            cosAngle, 
+            yCenter-(xCenter*sinAngle)-(yCenter*cosAngle)};
+        double matrixRotationFila2[3]={0.0,0.0,1.0};
+
+        for (int i=0; i<totalVertexCount;i++){ //Recorro lista de vertices
+            double x=coordsTemp[i].longitud;
+            double y=coordsTemp[i].latitud;
+            double w=coordsTemp[i].w;
+
+            coordsTemp[i].longitud = matrixRotationFila0[0]*x+matrixRotationFila0[1]*y+matrixRotationFila0[2]*w;
+            coordsTemp[i].latitud = matrixRotationFila1[0]*x+matrixRotationFila1[1]*y+matrixRotationFila1[2]*w;
+            coordsTemp[i].w=matrixRotationFila2[0]*x+matrixRotationFila2[1]*y+matrixRotationFila2[2]*w;
+
+        }
+        renderScreen();
+}
+
+void rotateUniverse(double degrees, int mode){
+    /*modo 3 si rapido
+    modo 2 si normal
+    modo 1 si lento
+    */
+    if (movementActivated==1){
+
+        double degreesToMoveIteration = 0.50*mode;
+        double degreeIteration = degrees/degreesToMoveIteration;
+        for (int i=0;i<abs(degreeIteration); i++){
+            if (degrees<0.0){ //ROtacion hacia la izquierda
+                progressiveMotionRotation(-degreesToMoveIteration);
+
+            }else if(degrees>0.0){ //Rotacion hacia la derecha
+                progressiveMotionRotation(degreesToMoveIteration);
+            }
+        }
+    }else{
+        progressiveMotionRotation(degrees);
+    }
+}
+
+void rotating(int direction, int specialMode){
+    //direction = 0 izquierda, 1 derecha
+    double degrees;
+
+    if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
+        degrees  = 30.0;
+        if (direction==0){    //Rotación izquierda    
+            
+            rotateUniverse(degrees, 3); //Rota 30 grados
+        }else {   //Rotacion derecha
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees, 3);
+        }
+        //printf("Rotacion rapida \n");
+        
+    }else if (specialMode == GLUT_ACTIVE_ALT){
+        degrees  = 5.0;
+        
+        if (direction==0){    //Rotación izquierda    
+            rotateUniverse(degrees, 1);
+        }else {   //Rotacion derecha
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees, 1);
+        } 
+        //printf("Rotacion lenta \n"); 
+    }else { //Modo normal
+        degrees  = 10.0;
+        if (direction==0){    //Rotación izquierda    
+            rotateUniverse(degrees,2);
+        }else {     //Rotacion derecha
+            degrees= -1.0*degrees;
+            rotateUniverse(degrees,2); 
+        }
+        
+        //printf("Rotacion normal\n");
+    }
+}
+
+//ZOOM////////////////////////////////////////////////////////////////////////////////////
+void progressiveMotionZooming(double newXmin, double newXmax, double newYmin, double newYmax){
+
+    double xMinAdvance=(newXmin-XminTemp)/movementProggression;
+    double xMaxAdvance=(newXmax-XmaxTemp)/movementProggression;
+    double yMinAdvance=(newYmin-YminTemp)/movementProggression;
+    double yMaxAdvance=(newYmax-YmaxTemp)/movementProggression;
+
+
+    for (int i=0;i<movementProggression; i++){
+        if (i+1==movementProggression){
+            XminTemp = newXmin; //Evitar imprecisión floating point
+            XmaxTemp = newXmax;
+            YminTemp = newYmin;
+            YmaxTemp = newYmax;
+        }else{
+            XminTemp+=xMinAdvance;
+            XmaxTemp+=xMaxAdvance;
+            YminTemp+=yMinAdvance;
+            YmaxTemp+=yMaxAdvance;
+        }
+        renderScreen();
+    }  
+}
+
+void zoomScene(double zoomScale){
+
+    //Cálculo del punto central de la ventana actual
+    calculateCenterPoint();
+    double newXminTemp, newYminTemp, newXmaxTemp, newYmaxTemp;
+
+    if (movementActivated==1){ //Movimiento progresivo activado
+        newXminTemp = ((XminTemp-xCenter)*zoomScale)+xCenter;
+        newYminTemp =((YminTemp-yCenter)*zoomScale)+yCenter;
+        newXmaxTemp =((XmaxTemp-xCenter)*zoomScale)+xCenter;
+        newYmaxTemp =((YmaxTemp-yCenter)*zoomScale)+yCenter;
+        progressiveMotionZooming(newXminTemp, newXmaxTemp, newYminTemp, newYmaxTemp);
+
+    }else{ //Movimiento progresivo desactivado
+        XminTemp = ((XminTemp-xCenter)*zoomScale)+xCenter;
+        YminTemp =((YminTemp-yCenter)*zoomScale)+yCenter;
+        XmaxTemp =((XmaxTemp-xCenter)*zoomScale)+xCenter;
+        YmaxTemp =((YmaxTemp-yCenter)*zoomScale)+yCenter;
+
+    }
+    
+
+    //printf("Centro: (%f, %f) \n", xCenter,yCenter);
+    //printf("Zoom con escala %f \n", zoomScale);
+}
+
+int validateZoom(double zoomScale){
+    /*Regresa 0 si la operacion si se puede realizar.
+    1 si no se puede realizar.
+    Recibe la cantidad de escalas que se pretende realizar.
+    Esta escala es negativa si se quiere hacer zoom in y
+    positiva si se quiere hacer zoom out.
+    REALIZA EL CAMBIO DEL CONTADOR AUTOMÁTICAMENTE.
+    */
+    double temp = zoomActual;
+    if(zoomInLimit<=(temp+zoomScale)){ //No se pasa del limite de ZoomIn?
+
+        if(zoomOutLimit>=(temp+zoomScale)){ //No se pasa del limite de ZoomOut?
+            zoomActual=temp+zoomScale; //Altera contador
+            //printf("Valido - zoomActual: %lf \n", zoomActual);
+            return 0; //Sí se puede realizar
+        }else{
+            return 1; //Se pasa del limite de zoomOut
+        }
+    }else{
+        return 1; //Se pasa del limite de zoomIn
+    }
+}
+
+void zooming(int typeZoom, int specialMode){
+    //Zoom out = typeZoom 0
+    //Zoom in = typeZoom 1
+    double z;
+
+    if (specialMode == GLUT_ACTIVE_SHIFT){ //RApida
+        //printf("Fast zooming \n");
+        z  = 3;
+        if (typeZoom==0){  //Zoom out
+            if(validateZoom(z)==1){ //Fuera de limites
+            /*Si es rápido y zoomIn, se le restan 3 al contador de zoom.
+            Lo mismo si es rápido y zoomOut, sólo que se le sumaría.
+            */
+                return;
+            }else{
+                zoomScene(z);
+            }
+            
+        }else { //Zoom In
+            
+            if(validateZoom(-z)==1){ //Fuera de limites
+                
+                return;
+            }else{
+                z=1/z;
+                zoomScene(z);
+            }    
+        }
+    }else if (specialMode == GLUT_ACTIVE_ALT){
+        z=1.5;
+        //printf("Slow zooming \n");
+        if (typeZoom==0){  //Zoom out
+            if(validateZoom(z)==1){ //Fuera de limites
+            /*Si es lento y zoomIn, se le restan 1.5 al contador de zoom.
+            Lo mismo si es lento y zoomOut, sólo que se le sumaría.
+            */
+                
+                return;
+            }else{
+                zoomScene(z);
+            }
+        }else { //Zoom In
+            if(validateZoom(-z)==1){ //Fuera de limites
+                
+                return;
+            }else{
+                z=1/z;
+                zoomScene(z);
+            }
+        }
+    }else{ //Modo normal
+
+        z=2;
+        if (typeZoom==0){  //Zoom out
+            if(validateZoom(z)==1){ //Fuera de limites
+            /*Si es normal y zoomIn, se le restan 2 al contador de zoom.
+            Lo mismo si es normal y zoomOut, sólo que se le sumaría.
+            */
+                
+                return;
+            }else{
+                zoomScene(z);
+            }
+        }else { //Zoom In
+            if(validateZoom(-z)==1){ //Fuera de limites
+                
+                return;
+            }else{
+                z=1/z;
+                zoomScene(z);  
+            }    
+        }
+    }
+}
+
+//TECLAS Y MOUSE//////////////////////////////////////////////////////////////////////////////
+unsigned int validateInput(){
+    if (inputEnable==0){
+        //printf("Input rechazado \n");
+        return 1; //Se rechaza;
+    }else{
+        disableKeyboardAndMouse();
+        return 0;
+    }
+}
+
+void mouse(int button, int state, int x, int y){
+    if(validateInput()==0){
+
+        if ((button==3) || (button==4)){  //3 es scroll up y 4 scroll down
+
+            if (state== GLUT_UP){
+                return;
+            }
+            int specialMode = glutGetModifiers();
+            if (specialMode == GLUT_ACTIVE_ALT){
+                return;
+            }
+            if (specialMode==GLUT_ACTIVE_SHIFT){
+                
+                if(button==3){
+                    //printf("Fast Scroll Up \n");
+                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
+                }else{
+                    //printf("Fast Scroll Down \n");
+                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+                }
+                
+            }
+            else if(specialMode==GLUT_ACTIVE_CTRL){
+                specialMode=GLUT_ACTIVE_ALT;
+                if(button==3){
+
+                    //printf("Slow Scroll Up \n");
+                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
+                }else{
+                    //printf("Slow Scroll Down \n");
+                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+                }
+            }else{
+                if(button==3){
+                    //printf(" Scroll Up \n");
+                    zooming(1,specialMode); //SE presiona Zoom out - o minúscula
+                }else{
+                    //printf(" Scroll Down \n");
+                    zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+                }
+            }
+
+        }  
+    }
+}
+
+void processKeyPressed(unsigned char key, int x, int y){
+    int specialMode = glutGetModifiers();
+    if (specialMode == GLUT_ACTIVE_CTRL){
+        return;
+    }
+    
+    switch (key){
+        case 114:  //Se presiona r minúscula- rave
+            if(validateInput()==0){
+                //printf("r presionada \n");
+                rave=1;
+                
+            }
+            break;
+
+        case 82:  //Se presiona R mayúscula- rave
+            if(validateInput()==0){
+                //printf("R presionada \n");
+                rave=1;
+                
+            }
+            
+            break;
+
+        case 110:  //Se presiona n minúscula
+            if(validateInput()==0){
+                //printf("n presionada \n");
+                rave=0;       
+            }
+            break;
+
+        case 78:  //Se presiona N mayúscula
+            if(validateInput()==0){
+                //printf("N presionada \n");
+                rave=0;
+            }
+            break;
+            
+        case 116: //Se presiona t minúscula
+            if(validateInput()==0){
+                //printf("t presionada \n");
+                activateTextures();
+            }
+            break;
+
+        case 84: //Se presiona T mayúscula
+            if(validateInput()==0){
+                //printf("T presionada \n");
+                activateTextures();
+                
+            }
+            break;
+
+        case 73: //Se presiona a Zoom In - i mayúscula
+            if(validateInput()==0){
+                //printf("I presionada \n");
+                zooming(1,specialMode);
+            }
+            break;
+
+        case 105:  //Se presiona d Zoom In - i minúscula
+            if(validateInput()==0){
+                //printf("i presionada \n");
+                zooming(1,specialMode);
+            }
+            break;
+
+        case 79: 
+            if(validateInput()==0){
+                //printf("O presionada \n");
+                zooming(0,specialMode); //SE presiona Zoom out - o mayúscula
+            }
+            break;
+
+        case 111:
+            if(validateInput()==0){
+                //printf("o presionada \n");
+                zooming(0,specialMode); //SE presiona Zoom out - o minúscula
+            }
+            break;
+
+        case 65: //A mayúscula- Rotate left
+            if(validateInput()==0){
+                //printf("A presionada \n");
+                rotating(0,specialMode);
+            }
+            break;
+
+        case 97: //a minúscula- Rotate left
+            if(validateInput()==0){
+                //printf("a presionada \n");
+                rotating(0,specialMode);
+            }
+            break;
+
+        case 68: //D mayúscula - Rotate right
+            if(validateInput()==0){
+                //printf("D presionada \n");
+                rotating(1,specialMode);
+            }
+            
+            break;
+
+        case 100: //d minúscula - Rotate right
+            if(validateInput()==0){
+                //printf("d presionada \n");
+                rotating(1,specialMode);
+            }
+            break; 
+
+        case 27: //Escape presionado
+            //printf("Programa finalizado \n");
+            exit(0);
+
+        case 32: //Barra espaciadora presionada
+            if(validateInput()==0){
+                //resetValues();
+                //printf("Ventana reseteada \n");
+            }
+            break;
+
+        case 77: //M mayúscula - Bandera de movimiento
+            if(validateInput()==0){
+                //printf("M presionada \n");
+                changeMovementFlag();
+            }
+            break;
+
+        case 109: //m minúscula - Bandera de movimiento
+            if(validateInput()==0){
+                //printf("m presionada \n");
+                changeMovementFlag();
+            }
+            break;
+
+        case 70: //F mayúscula - fillScanline
+            if(validateInput()==0){
+                //printf("f presionada \n");
+                activateScanlineFlag();
+            }
+            break;
+
+        case 102: //f minúscula - fillScanline
+            if(validateInput()==0){
+                //printf("f presionada \n");
+                activateScanlineFlag();
+            }
+            break;
+        case 76: // L presionada // sólo lineas
+            if(validateInput()==0){
+                //printf("L presionada \n");
+                activateLinesOnly();
+            }
+            break;
+
+        case 108: //l presionada - sólo lineas
+            if(validateInput()==0){
+                //printf("l presionada \n");
+                activateLinesOnly();
+            }
+            break;
+
+    }        
+}
+
+void specialKeys(int key, int x, int y){
+
+    int specialMode = glutGetModifiers();
+    int directionPan;
+
+    if (specialMode == GLUT_ACTIVE_CTRL){return;}
+    
+    switch (key){
+
+        case GLUT_KEY_UP:
+            if(validateInput()==0){
+                directionPan = 1;
+                //printf("Panning up \n");
+                panning  (directionPan, specialMode);
+            }
+            break;
+
+        case GLUT_KEY_DOWN:
+            if(validateInput()==0){
+                directionPan = 0;
+                //printf("Panning down \n");
+                panning  (directionPan, specialMode);
+            }
+            break;
+
+        case GLUT_KEY_RIGHT:
+            if(validateInput()==0){
+                directionPan = 3;
+                //printf("Panning right \n");
+                panning  (directionPan, specialMode);
+            }
+            break;
+
+        case GLUT_KEY_LEFT:
+            if(validateInput()==0){
+                directionPan = 2;
+                //printf("Panning left \n");
+                panning (directionPan, specialMode);
+            }
+            break;
+
+    }
+}
+
+int main(int argc, char *argv[]){
+    printf("Los comandos disponibles son:\n a - \n \t Rotación en sentido del reloj\n d - \n  \t Rotación en sentido contrario al reloj\n ← - \n \t Paneo hacia la izquierda (el efecto mueve el mapa a la derecha)\n → - \n \t Paneo hacia la derecha (el efecto mueve el mapa a la izquierda)\n ↑ - \n \t Paneo hacia arriba (el efecto mueve el mapa hacia abajo)\n ↓ - \n \t Paneo hacia abajo (el efecto mueve el mapa hacia arriba)\n mouse scroll down - \n \t Zoom out \n mouse scroll up - \n \t Zoom in \n shift + (a, d, ←, →, ↑, ↓, mouse scroll down, mouse scroll up) - \n \t Versión acelerada de cualquiera de los efectos previamente descritos \n alt + (a, d, ←, →, ↑, ↓) - \n \t Versión ralentizada de los efectos rotación y paneo correspondientes. \n ctrl + (mouse scroll down, mouse scroll up) - \n \t Versión ralentizada de los zoom in y zoom out. \n r - \n \t 'Rave' hace que el fondo cambie constantemente de color. Discreción en caso de sensibilidad a este efecto. \n esc - \n \t Cierra el programa. \n\n\n");
+    
     srand((unsigned) time(&t));
     char *ts[7] = { "textures/1.ppm", "textures/2.ppm", "textures/3.ppm", "textures/4.ppm",
                     "textures/5.ppm", "textures/6.ppm", "textures/7.ppm" };
@@ -1814,9 +1766,11 @@ int main(int argc, char *argv[]){
         glutReshapeFunc(resize);
 
         glutMainLoop();
+
+        
     }
     else {
-        printf("El alguno de los archivos de puntos no pudo abrirse.");
+        printf("Alguno de los archivos de puntos no pudo abrirse.");
     }
 
    
