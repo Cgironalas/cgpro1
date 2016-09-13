@@ -49,9 +49,7 @@ Los comandos disponibles son:
 	spacebar - 
 		Resetea el mapa a la posición orignal en que se cargó
 	m- 
-		Desactiva el movimiento fluido 
-	s-
-		Activa el movimiento fluido 
+		Activa/desactiva el movimiento fluido 
 	esc - 
 		Cierra el programa.
 
